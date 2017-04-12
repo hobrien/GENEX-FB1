@@ -1,0 +1,476 @@
+---
+title: "Figures"
+author: "Heath O'Brien"
+date: "4/9/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(gridExtra)
+library(clusterProfiler)
+library(xlsx)
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
+dir.create("../Results")
+
+fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome')) 
+
+fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
+fittedBias <-  filter(fittedBias, ageBin != '12-19')
+
+gene_sets <-read_delim("../Data/GeneSets.txt", 
+                         "\t", escape_double = FALSE, col_names=c('gene_name', 'set', 'reference', 'Id'), 
+                         trim_ws = TRUE)
+counts <- read_delim("../Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(label=as.character(label))
+
+PlotFC <- function(genes, title) {
+  plot <- ggplot(genes, aes(x=ageBin, y=log2FoldDiff, group=Id)) +
+    geom_line(alpha=.1) +
+    geom_point(colour='red', size=1, alpha=.25, data=filter(genes, padj<0.1)) +
+    figure_theme() +
+    ylab("<--- Female-biased        Male-biased --->") +
+    xlab("Post-conception week") +
+    theme(axis.title.y=element_text(size=9)) +
+    ggtitle(title)
+  plot        
+}
+```
+
+
+Figure 1. a) Number of genes exhibiting sex-biased expression at FDR < 0.1 at each developmental time-point. b) Mean Log2-fold sex differences in all detected genes at each developmental time-point. Black dots indicate significant sex biases (FDR < 0.1). Multiple genes on the Y-chromosome are expressed in males across all time-points; the X-chromosome gene displaying pronounced differences across all time-points is XIST. Numbers of males (M) and females (F) included at each time-point are: 12 PCW = 10 M and 6 F; 13 PCW = 17 M and 14 F; 14 PCW = 8 M and 10 F; 15–16 PCW = 15 M and 8 F; 17-19 PCW = 12 M and 8 F.
+
+```{r}
+Fig1a <- fittedBias %>% filter(padj < .1 ) %>%
+  ggplot(aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
+  facet_grid(. ~ ageBin) +
+    figure_theme() +
+    scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Fetal sex') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.')
+
+Fig1b <- ggplot(fittedBias, aes(x=ageBin, y=log2FoldDiff, group=Id)) + 
+    geom_line(alpha=1, aes(colour=ChrType)) +
+    geom_point(colour='black', size=1, alpha=.25, data=filter(fittedBias, padj < .1 )) +
+    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) + 
+    figure_theme() +
+    ylab("<--- Female-biased        Male-biased --->") +
+    xlab("Post-conception week") +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('B.') +
+    theme(legend.position='right')
+
+
+png(file="../Results/Fig1.png", bg="transparent", width=183, height=70, units='mm', res=300)
+grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
+dev.off()
+pdf(file="../Results/Fig1.pdf", 7.2, 3)
+grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
+dev.off()
+
+grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
+
+```
+
+Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
+``` {r}
+AN <- gene_sets %>% 
+  filter(set=='cluster7' & gene_name != 'XIST') %>% 
+  left_join(fittedBias)
+
+FR <- gene_sets %>% 
+  filter(set=='cluster9' & gene_name != 'RPS4Y1') %>%
+  left_join(fittedBias)
+
+png(file="../Results/Fig2.png", bg="transparent", width=183, 
+    height=70, units='mm', res=300)
+grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
+dev.off()
+pdf(file="../Results/Fig2.pdf", 7.2, 3)
+grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
+dev.off()
+
+grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
+
+```
+
+Figure 3: Expression data for selected genes characteristic of mature neurons (GABRA1, GRIN2A) and proliferating neural progenitor cells (NES, EOMES) in 14 PCW brain samples (8 male, 10 female).
+```{r}
+PlotTimepoint<-function(geneID, counts, fittedBias, target, ages, title) {
+  geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+  ageSplit <- strsplit(ages, '-')[[1]]
+  min <- ageSplit[1]
+  max <- ageSplit[length(ageSplit)]
+  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+    dplyr::select(-SYMBOL, -Id, -Chr) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'label'), sep='[.]') %>%
+    dplyr::select(label, value) %>%
+    left_join(target) %>%
+    filter(PCW >= min & PCW <= max)
+  mean <- filter(fittedBias, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
+  fc <- mean$log2FoldDiff[1] %>% format(digits=2)
+  pval <- mean$pvalue[1]
+  qval <- mean$padj[1]
+  mean <- mean %>% dplyr::select(Male, Female) %>%
+    gather('Sex', 'mean')
+  plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
+    geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75) + 
+    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
+    ylab("Normalised counts") +
+    xlab('') +
+    figure_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+     theme(plot.title=element_text(face="italic")) +
+    ggtitle(title) 
+  plot
+}
+
+Fig3a <- PlotTimepoint('GABRA1', counts, fittedBias, target, '14', 'GABRA1')
+Fig3b <- PlotTimepoint('GRIN2A', counts, fittedBias, target, '14', 'GRIN2A')
+Fig3c <- PlotTimepoint('NES', counts, fittedBias, target, '14', 'NES')
+Fig3d <- PlotTimepoint('EOMES', counts, fittedBias, target, '14', 'EOMES')
+png(file="../Results/Fig3.png", bg="transparent", width=183, height=140, units='mm', res=300)
+grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
+dev.off()
+pdf(file="../Results/Fig3.pdf", 7.2, 5.5)
+grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
+dev.off()
+
+grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
+```
+
+Figure S1
+
+```{r}
+p1 <- ggplot(target, aes(x=PCW, fill=Sex)) +
+  geom_bar() +
+  facet_grid(Sex ~ .) +
+  scale_y_continuous(breaks=seq(0,100, 2)) +
+  scale_x_continuous(breaks=seq(11,19, 1)) +
+  figure_theme() +
+  xlab("Post-conception weeks") +
+  ylab("Count") +
+  theme(axis.text.x=element_text(size=8)) +
+  scale_fill_brewer(type = "qual", palette = 6) +
+  ggtitle('A.')
+
+target <- mutate(target, age_bin =ifelse(target$PCW == 16, 15, 
+                                     ifelse(target$PCW > 16, 16, target$PCW)))
+p2 <- ggplot(target, aes(x=age_bin, fill=Sex)) +
+  geom_bar() +
+  facet_grid(Sex ~ .) +
+  scale_y_continuous(breaks=seq(0,100, 2)) +
+  scale_x_continuous(breaks=c(11,12,13,14,15,16),
+                     labels=c('11','12','13','14','15-16','17-19')) +
+  figure_theme() +
+  xlab("Post-conception weeks") +
+  ylab("Count") +
+  theme(axis.text.x=element_text(size=8)) +
+  scale_fill_brewer(type = "qual", palette = 6) +
+  ggtitle('B.')
+
+pdf(file="../Results/FigS1.pdf", 7.2, 5.5)
+grid.arrange(p1, p2, ncol=2)
+dev.off()
+png(file="../Results/FigS1.png", bg="transparent", width=183, height=140, units='mm', res=300)
+grid.arrange(p1, p2, ncol=2)
+dev.off()
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+Figure S2
+```{r}
+Neuronal <- gene_sets %>% 
+  filter(set=='Neuronal' & gene_name != 'XIST') %>% 
+  left_join(fittedBias)
+
+RG <- gene_sets %>% 
+  filter(set=='RadialGlia' & gene_name != 'XIST') %>%
+  left_join(fittedBias)
+
+NPC <- gene_sets %>% 
+  filter(set=='NPC' & gene_name != 'RPS4Y1') %>%
+  left_join(fittedBias)
+
+png(file="../Results/FigS2.png", bg="transparent", width=183, 
+    height=210, units='mm', res=300)
+grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
+             PlotFC(RG, 'B. Radial glia genes'),
+             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
+             ncol=1)
+dev.off()
+pdf(file="../Results/FigS2.pdf", 7.2, 9)
+grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
+             PlotFC(RG, 'B. Radial glia genes'),
+             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
+             ncol=1)
+dev.off()
+
+grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
+             PlotFC(RG, 'B. Radial glia genes'),
+             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
+             ncol=1)
+
+```
+
+Enrichment Analysis
+Week 14
+```{r}
+
+#disease2gene <- filter(gene_sets, ! set %in% c('SandersASD', 'SFARI'))[, c("set", "gene_name")] 
+disease2gene <- filter(gene_sets, ! set %in% c('SandersASD', 'SFARI')) %>% dplyr::select(set, gene_name) 
+FemaleDEG <- fittedBias %>% filter(ageBin == '14' & padj<0.1 & log2FoldDiff <0)
+
+FemaleEnrichment <- summary(enricher(FemaleDEG$SYMBOL, TERM2GENE=disease2gene, pAdjustMethod='bonferroni'))
+FemaleEnrichment$Direction <- 'FemaleBiased'
+
+MaleDEG <- fittedBias %>% filter(ageBin == '14' & padj<0.1 & log2FoldDiff >0)
+
+MaleEnrichment <- summary(enricher(MaleDEG$SYMBOL, TERM2GENE=disease2gene, pAdjustMethod='bonferroni'))
+MaleEnrichment$Direction <- 'MaleBiased'
+Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>% 
+  separate(GeneRatio, c('x1', 'y1'), sep='/', remove=FALSE) %>% 
+  separate(BgRatio, c('x2', 'y2'), sep='/', remove=FALSE) %>%
+  mutate(Enrichment=(as.numeric(x1)/as.numeric(y1))/(as.numeric(x2)/as.numeric(y2))) %>%
+  dplyr::select(Direction, ID, GeneRatio, BgRatio, Enrichment, pvalue, p.adjust, qvalue, geneID)
+
+#Need to correct for 10 test because we tested 2 sets of DE genes
+#For some mysterious reason, enricher is correcting for 4 tests even though there are clearly 5 gene sets being tested.
+Enrichment$p.adjust <- p.adjust(Enrichment$pvalue, method='bonferroni', n=10)
+
+write_tsv(Enrichment, "../Results/Enrichment14.txt")
+Enrichment
+```
+
+All weeks (65 high-cofindence Autism genes)
+```{r}
+
+disease2gene <- filter(gene_sets, set %in% c('SandersASD', 'Background'))[, c("set", "gene_name")] 
+
+FemaleDEG <- fittedBiasAll %>% filter(padj<0.1 & log2FoldDiff < 0)
+
+FemaleEnrichment <- summary(enricher(FemaleDEG$SYMBOL, TERM2GENE=disease2gene, pAdjustMethod='bonferroni'))
+dim(FemaleEnrichment)
+#FemaleEnrichment$Direction <- 'FemaleBiased'
+
+MaleDEG <- fittedBiasAll %>% filter(padj<0.1 & log2FoldDiff > 0)
+
+MaleEnrichment <- summary(enricher(MaleDEG$SYMBOL, TERM2GENE=disease2gene, pAdjustMethod='bonferroni'))
+MaleEnrichment$Direction <- 'MaleBiased'
+Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>% 
+  separate(GeneRatio, c('x1', 'y1'), sep='/', remove=FALSE) %>% 
+  separate(BgRatio, c('x2', 'y2'), sep='/', remove=FALSE) %>%
+  mutate(Enrichment=(as.numeric(x1)/as.numeric(y1))/(as.numeric(x2)/as.numeric(y2))) %>%
+  dplyr::select(Direction, ID, GeneRatio, BgRatio, Enrichment, pvalue, p.adjust, qvalue, geneID)
+
+#Need to correct for test because 2 sets of DE genes
+Enrichment$p.adjust <- p.adjust(Enrichment$pvalue, method='bonferroni', n=2)
+write_tsv(Enrichment, "../Results/EnrichmentAll.txt")
+Enrichment
+```
+
+Supplementary Table 1
+```{r}
+DEG12_19 <- fittedBiasAll %>% filter(padj<0.1) %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG12_19), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS1')
+```
+
+Supplementary Table 2
+```{r}
+previous <- read_tsv("../Data/previous_findings.txt")
+sig_res <- fittedBiasAll %>% bind_rows(fittedBias) %>% filter(padj < 0.1) %>%
+  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')')) %>%
+  dplyr::select(Id, SYMBOL, Chr, ageBin, result) %>%
+  spread(ageBin, result) %>% 
+  dplyr::select(`Ensembl ID` = Id, 
+                `Gene ID` = SYMBOL,
+                Chromosome = Chr,
+                `12-19 PCW` = `12-19`,
+                `12 PCW` = `12`,
+                `13 PCW` = `13`,
+                `14 PCW` = `14`,
+                `15-16 PCW` = `15-16`,
+                `17-19 PCW` = `17-19`) %>%
+  left_join(previous)
+
+write.xlsx2(as.data.frame(sig_res), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS2',
+            append=TRUE)
+```
+
+Supplementary Table 3
+```{r}
+Xinactivation <- read_tsv('../Data/Xinactivation.txt')
+write.xlsx2(as.data.frame(Xinactivation), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS3',
+            append=TRUE)
+```
+
+Supplementary Tables 4 & 5
+```{r}
+GO_M_all <- read_tsv('../Data/DAVID_M12_19.txt')
+write.xlsx2(as.data.frame(GO_M_all), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS4',
+            append=TRUE)
+
+GO_F_all <- read_tsv('../Data/DAVID_F12_19.txt')
+write.xlsx2(as.data.frame(GO_F_all), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS5',
+            append=TRUE)
+
+```
+
+Supplementary Tables 6 - 10
+```{r}
+DEG12 <- fittedBias %>% filter(padj<0.1 & ageBin == 12) %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG12), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS6',
+            append=TRUE)
+
+DEG13 <- fittedBias %>% filter(padj<0.1 & ageBin == 13) %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG13), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS7',
+            append=TRUE)
+
+DEG14 <- fittedBias %>% filter(padj<0.1 & ageBin == 14) %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG14), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS8',
+            append=TRUE)
+
+DEG15_16 <- fittedBias %>% filter(padj<0.1 & ageBin == '15-16') %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG15_16), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS9',
+            append=TRUE)
+
+DEG17_19 <- fittedBias %>% filter(padj<0.1 & ageBin == '17-19') %>%
+  mutate(`Fold Difference` = 2^log2FoldDiff) %>%
+  dplyr::select(`Ensembl ID` = Id, 
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference`,
+         `p value` = pvalue,
+         `FDR` = padj)
+
+write.xlsx2(as.data.frame(DEG17_19), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS10',
+            append=TRUE)
+```
+
+Supplementary Tables 11 & 12
+```{r}
+GO_M_14 <- read_tsv('../Data/DAVID_M14.txt')
+write.xlsx2(as.data.frame(GO_M_14), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS11',
+            append=TRUE)
+
+GO_F_14 <- read_tsv('../Data/DAVID_F14.txt')
+write.xlsx2(as.data.frame(GO_F_14), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS12',
+            append=TRUE)
+
+```
+
+Supplementary Table 13
+```{r}
+SampleInfo <- read_tsv("../Data/SampleInfo.txt") %>%
+  mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
+  dplyr::select(-TotalFragments)
+write.xlsx2(as.data.frame(SampleInfo), 
+            file="../Results/SupplemtalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS13',
+            append=TRUE)
+
+```
