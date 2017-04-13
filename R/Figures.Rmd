@@ -27,8 +27,8 @@ gene_sets <-read_delim("../Data/GeneSets.txt",
                          trim_ws = TRUE)
 counts <- read_delim("../Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(label=as.character(label))
+target <- read_delim("../Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(label=as.character(Sample))
 
 PlotFC <- function(genes, title) {
   plot <- ggplot(genes, aes(x=ageBin, y=log2FoldDiff, group=Id)) +
