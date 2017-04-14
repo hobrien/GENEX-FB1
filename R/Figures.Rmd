@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(stringr)
+library(forcats)
 library(gridExtra)
 library(clusterProfiler)
 library(xlsx)
@@ -17,7 +19,7 @@ dir.create("../Results")
 
 fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome')) 
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
 
 fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
 fittedBias <-  filter(fittedBias, ageBin != '12-19')
@@ -110,7 +112,7 @@ grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
 Figure 3: Expression data for selected genes characteristic of mature neurons (GABRA1, GRIN2A) and proliferating neural progenitor cells (NES, EOMES) in 14 PCW brain samples (8 male, 10 female).
 ```{r}
 PlotTimepoint<-function(geneID, counts, fittedBias, target, ages, title) {
-  geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+  geneID = str_replace(geneID, '(ENSG\\d+)\\.\\d+', '\\1')
   ageSplit <- strsplit(ages, '-')[[1]]
   min <- ageSplit[1]
   max <- ageSplit[length(ageSplit)]
@@ -290,14 +292,10 @@ Enrichment
 Supplementary Table 1
 ```{r}
 DEG12_19 <- fittedBiasAll %>% filter(padj<0.1) %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-DEG12_19 <- DEG12_19 %>% 
-  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG12_19, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
@@ -316,19 +314,14 @@ write.xlsx2(as.data.frame(DEG12_19),
 Supplementary Table 2
 ```{r}
 previous <- read_tsv("../Data/previous_findings.txt")
-sig_res <- fittedBiasAll %>% bind_rows(fittedBias) %>% filter(padj < 0.1) %>%
+sig_res <- fittedBiasAll %>% 
+  bind_rows(fittedBias) %>% 
+  filter(padj < 0.1) %>%
   mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')')) %>%
   dplyr::select(Id, SYMBOL, Chr, ageBin, result) %>%
   spread(ageBin, result) %>% 
-  arrange(Chr)
-
-sig_res <- sig_res %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(sig_res, Chr %in% c('chrX', 'chrY')))
-
-sig_res <-sig_res %>% dplyr::select(`Ensembl ID` = Id, 
+  arrange(Chr) %>% 
+  dplyr::select(`Ensembl ID` = Id, 
                 `Gene ID` = SYMBOL,
                 Chromosome = Chr,
                 `12-19 PCW` = `12-19`,
@@ -338,7 +331,6 @@ sig_res <-sig_res %>% dplyr::select(`Ensembl ID` = Id,
                 `15-16 PCW` = `15-16`,
                 `17-19 PCW` = `17-19`) %>%
   left_join(previous)
-
 
 write.xlsx2(as.data.frame(sig_res), 
             file="../Results/SupplemtalTables.xlsx", 
@@ -378,14 +370,10 @@ write.xlsx2(as.data.frame(GO_F_all),
 Supplementary Tables 6 - 10
 ```{r}
 DEG12 <- fittedBias %>% filter(padj<0.1 & ageBin == 12) %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-
-DEG12 <- DEG12 %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG12, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
@@ -402,14 +390,10 @@ write.xlsx2(as.data.frame(DEG12),
             append=TRUE)
 
 DEG13 <- fittedBias %>% filter(padj<0.1 & ageBin == 13) %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-
-DEG13 <- DEG13 %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG13, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
@@ -426,14 +410,10 @@ write.xlsx2(as.data.frame(DEG13),
             append=TRUE)
 
 DEG14 <- fittedBias %>% filter(padj<0.1 & ageBin == 14) %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-
-DEG14 <- DEG14 %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG14, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
@@ -450,14 +430,10 @@ write.xlsx2(as.data.frame(DEG14),
             append=TRUE)
 
 DEG15_16 <- fittedBias %>% filter(padj<0.1 & ageBin == '15-16') %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-
-DEG15_16 <- DEG15_16 %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG15_16, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
@@ -474,14 +450,10 @@ write.xlsx2(as.data.frame(DEG15_16),
             append=TRUE)
 
 DEG17_19 <- fittedBias %>% filter(padj<0.1 & ageBin == '17-19') %>%
-  mutate(`FoldDiff` = 2^log2FoldDiff, pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  arrange(Chr)
-
-DEG17_19 <- DEG17_19 %>%  filter(! Chr %in% c('chrX', 'chrY')) %>%
-  mutate(Chr = sub("chr", "", Chr)) %>%
-  arrange(as.numeric(Chr)) %>%
-  mutate(Chr = paste0("chr",as.character(Chr))) %>%
-  bind_rows(filter(DEG17_19, Chr %in% c('chrX', 'chrY'))) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
   dplyr::select(`Ensembl ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
