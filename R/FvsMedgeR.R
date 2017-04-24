@@ -6,13 +6,11 @@
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
 
-getwd()
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
 library(devtools)
 load_all(pkg = "SARTools")
 library(tidyverse)
-source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
 option_list <- list(
   make_option(c("-m", "--min"), type="integer", default=NULL, 
@@ -57,14 +55,14 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
 projectName <- paste("MvsF", 
                      ageBin,
                      ifelse(pcw, "PCW_FDR", "FDR"),
-                     alpha)                         # name of the project
+                     alpha, sep='_')                         # name of the project
 
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
 
 workDir <- paste("../Results", projectName, sep='/')      # working directory for the R session
 
-rawDir <- "../Counts/"                                      # path to the directory containing raw counts files
+rawDir <- "../Counts"                                      # path to the directory containing raw counts files
 
 targetFile <- "../Shiny/GENEX-FB1/Data/target.txt"
 
@@ -73,9 +71,9 @@ featuresToRemove <- c("alignment_not_unique",        # names of the features to 
                       "not_aligned", "too_low_aQual")# NULL if no feature to remove
 
 if ( pcw ) {
-  batch <- c("Centre", "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
+  batch <- c("Sequencer", "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
 } else {
-  batch <- c("Centre", "RIN")                # blocking factor: NULL (default) or "batch" for example
+  batch <- c("Sequencer", "RIN")                # blocking factor: NULL (default) or "batch" for example
 }
 
 varInt <- "Sex"                                    # factor of interest
@@ -98,9 +96,17 @@ colors <- c("dodgerblue","firebrick1",               # vector of colors of each 
 # loading target file
 target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(label=as.character(label))
+target <- arrange(target, Sex)
+if (!is.na(RIN_cutoff)) {
+  target <- filter(target, RIN >= RIN_cutoff)
+}
+if (!is.null(PCW_cutoff)) {
+  target <- filter(target, PCW >= PCW_cutoff[1] & PCW < PCW_cutoff[2])
+}
+target <- as.data.frame(target)
+target$Sex=factor(target$Sex)
+target$Sequencer=factor(target$Sequencer)
 
-dir.create(workDir)
-setwd(workDir)
 
 # checking parameters
 checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
@@ -112,6 +118,9 @@ checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFil
 
 # loading counts
 counts <- loadCountData(target=target, rawDir=rawDir, featuresToRemove=featuresToRemove)
+
+dir.create(workDir)
+setwd(workDir)
 
 # description plots
 majSequences <- descriptionPlots(counts=counts, group=target[,varInt], col=colors)
@@ -155,11 +164,11 @@ MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALS
 right_join(gene_info, MalevsFemale.down) %>% 
     write_tsv(paste0("tables/FemaleUp", ageBin, ".txt"))
 
-MalevsFemale.down <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
-  filter(MalevsFemale.complete, ! is.na(padj)) %>%
+MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
+  filter(! is.na(padj)) %>%
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
   dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-right_join(gene_info, MalevsFemale.down) %>% 
+right_join(gene_info, MalevsFemale.complete) %>% 
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
 
