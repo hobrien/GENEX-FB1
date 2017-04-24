@@ -6,8 +6,13 @@
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
 
+getwd()
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
+library(devtools)
+load_all(pkg = "SARTools")
+library(tidyverse)
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
 option_list <- list(
   make_option(c("-m", "--min"), type="integer", default=NULL, 
@@ -89,12 +94,13 @@ colors <- c("dodgerblue","firebrick1",               # vector of colors of each 
 ################################################################################
 ###                             running script                               ###
 ################################################################################
+
+# loading target file
+target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(label=as.character(label))
+
 dir.create(workDir)
 setwd(workDir)
-library(devtools)
-load_all(pkg = "SARTools")
-library(tidyverse)
-source(paste0(LabNotes, "../Shiny/GENEX-FB1/FormatGGplot.R"))
 
 # checking parameters
 checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
@@ -103,9 +109,6 @@ checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFil
                       cpmCutoff=cpmCutoff,gene.selection=gene.selection,
                       normalizationMethod=normalizationMethod,colors=colors)
 
-# loading target file
-target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(label=as.character(label))
 
 # loading counts
 counts <- loadCountData(target=target, rawDir=rawDir, featuresToRemove=featuresToRemove)
