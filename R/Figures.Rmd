@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(stringr)
-library(forcats)
 library(gridExtra)
 library(clusterProfiler)
 library(xlsx)
@@ -19,7 +18,9 @@ dir.create("../Results")
 
 fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
+         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
+         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
 
 fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
 fittedBias <-  filter(fittedBias, ageBin != '12-19')

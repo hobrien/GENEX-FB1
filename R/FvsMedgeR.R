@@ -42,14 +42,15 @@ pcw <- opt$age
 exclude_sex <- opt$sex_chromosomes
 
 
+ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1, 
+                 paste(PCW_cutoff, 
+                       collapse ='_'
+                 ),
+                 PCW_cutoff[1]
+)
 
 projectName <- paste("MvsF", 
-                     ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1, 
-                            paste(PCW_cutoff, 
-                                  collapse ='_'
-                            ),
-                            PCW_cutoff[1]
-                     ),
+                     ageBin,
                      ifelse(pcw, "PCW_FDR", "FDR"),
                      alpha)                         # name of the project
 
@@ -134,23 +135,29 @@ writeReport.edgeR(target=target, counts=counts, out.edgeR=out.edgeR, summaryResu
                   gene.selection=gene.selection, normalizationMethod=normalizationMethod)
 
 
-################################################################################
-###                          additional steps                                ###
-################################################################################
 
-DEgenes=NA
-MalevsFemale.up <- read.delim("tables/MalevsFemale.up.txt", check.names=FALSE)
-MalevsFemale.up <- dplyr::select(MalevsFemale.up, Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-MalevsFemale.up <- bind_cols(GetGeneIDs(MalevsFemale.up$Id), MalevsFemale.up)
-write.table(MalevsFemale.up, file="tables/MaleUp.txt", sep="\t", quote=FALSE, row.names=FALSE)
-MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALSE)
-MalevsFemale.down <- dplyr::select(MalevsFemale.down, Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-MalevsFemale.down <- bind_cols(GetGeneIDs(MalevsFemale.down$Id), MalevsFemale.down)
-write.table(MalevsFemale.down, file="tables/FemaleUp.txt", sep="\t", quote=FALSE, row.names=FALSE)
-DEgenes <- nrow(MalevsFemale.down) + nrow(MalevsFemale.up)
-MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)
-filter(MalevsFemale.complete, ! is.na(padj)) %>%
-  write_tsv("tables/MalevsFemale.background.txt")
+gene_info <- read_tsv("~/BTSync/FetalRNAseq/GENEX-FB1/Data/genes.csv") %>%
+  mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
+  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
+
+MalevsFemale.up <- read.delim("tables/MalevsFemale.up.txt", check.names=FALSE)  %>% 
+  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+right_join(gene_info, MalevsFemale.up) %>% 
+  write_tsv(paste0("tables/MaleUp", ageBin, ".txt"))
+
+MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALSE)  %>% 
+  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+right_join(gene_info, MalevsFemale.down) %>% 
+    write_tsv(paste0("tables/FemaleUp", ageBin, ".txt"))
+
+MalevsFemale.down <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
+  filter(MalevsFemale.complete, ! is.na(padj)) %>%
+  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+right_join(gene_info, MalevsFemale.down) %>% 
+  write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
 
 
