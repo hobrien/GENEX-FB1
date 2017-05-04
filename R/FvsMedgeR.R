@@ -54,7 +54,8 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
 
 projectName <- paste("MvsF", 
                      ageBin,
-                     ifelse(pcw, "PCW_FDR", "FDR"),
+                     paste0(ifelse(! is.na(RIN_cutoff), paste0('RIN', RIN_cutoff,'_'), ''),
+                     ifelse(pcw, "PCW_FDR", "FDR")),
                      alpha, sep='_')                         # name of the project
 
 
