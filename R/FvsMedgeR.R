@@ -22,7 +22,11 @@ option_list <- list(
   make_option(c("-p", "--pvalue"), type="numeric", default=0.1, 
               help="corrected pvalue cutoff", metavar="pvalue"),
   make_option(c("-a", "--age"), action='store_true', type="logical", default=FALSE, 
-              help="Include age as a cofactor", metavar="age")
+              help="Include age as a cofactor", metavar="age"),
+  make_option(c("--male"), type="integer", default=NULL, 
+              help="number of male samples"),
+  make_option(c("--female"), type="integer", default=NULL, 
+              help="number of female samples")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -43,7 +47,8 @@ alpha <- opt$pvalue
 BrainBank <- opt$brainbank
 pcw <- opt$age
 exclude_sex <- opt$sex_chromosomes
-
+male <- opt$male
+female <- opt$female
 
 ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1, 
                  paste(PCW_cutoff, 
@@ -52,11 +57,12 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  PCW_cutoff[1]
 )
 
-projectName <- paste("MvsF", 
+projectName <- paste0("MvsF_", 
                      ageBin,
-                     paste0(ifelse(! is.na(RIN_cutoff), paste0('RIN', RIN_cutoff,'_'), ''),
-                     ifelse(pcw, "PCW_FDR", "FDR")),
-                     alpha, sep='_')                         # name of the project
+                     ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
+                     ifelse(!is.null(male), 'Subsample_', ''),
+                     ifelse(pcw, "PCW_FDR_", "FDR_"),
+                     alpha)                         # name of the project
 
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
@@ -108,6 +114,13 @@ target <- as.data.frame(target)
 target$Sex=factor(target$Sex)
 target$Sequencer=factor(target$Sequencer)
 
+if (!is.null(male)) {
+  MaleSamples <- filter(target, Sex=='Male')
+  MaleSamples <- MaleSamples[sample(nrow(MaleSamples), male),]
+  FemaleSamples <- filter(target, Sex=='Female')
+  FemaleSamples <- FemaleSamples[sample(nrow(FemaleSamples), female),]
+  target <- bind_rows(MaleSamples, FemaleSamples)
+}
 
 # checking parameters
 checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
