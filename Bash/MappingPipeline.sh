@@ -72,3 +72,18 @@ then
       ~/GENEX-FB1/Bash/SamtoolsIndex.sh \
       $BASEDIR/$SampleID/${SampleID}_sort.bam     
 fi
+
+if [ ! -f $BASEDIR/$SampleID/$SampleID.ex.stats.txt ] | [ ! -f $BASEDIR/$SampleID/$SampleID.in.stats.txt ]
+then
+    echo "Running RNAseqQC $SampleID"
+    qsub -N h${SampleID}_stats -hold_jid h${SampleID}_index \
+       ~/GENEX-FB1/Bash/s/RNAseqQC.sh $BASEDIR/$SampleID/BAM/$SampleID.sort.bam   
+fi
+
+if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.chr.counts.txt ]
+then
+    echo "Running htseq-count $SampleID"
+    qsub -N h${SampleID}_count -hold_jid h${SampleID}_stats \
+      ~/GENEX-FB1/Bash/htseq-count.sh $BASEDIR/$SampleID/BAM/$SampleID.chr.bam   
+fi
+
