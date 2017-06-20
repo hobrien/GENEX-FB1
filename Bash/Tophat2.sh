@@ -9,6 +9,6 @@
 
 
 tophat --keep-fasta-order --library-type fr-secondstrand --mate-inner-dist 500 --mate-std-dev 50 --num-threads 8 \
-      --transcriptome-index GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.inx \
-      --output-dir Results \
-      /GRCh38/NCBI/GRCh38Decoy/Sequence/Bowtie2Index/genome $@
+      --transcriptome-index /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.inx \
+      --output-dir $1 \
+      /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Sequence/Bowtie2Index/genome $2 $3
