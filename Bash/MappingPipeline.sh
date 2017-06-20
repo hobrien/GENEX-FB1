@@ -26,7 +26,20 @@ then
     fi    
 fi
 
-if [ ! -f $BASEDIR/$SampleID/$SampleID.bam ]
+if [ ! -d $BASEDIR/$SampleID/BAM ]
+then
+    echo "Creating directory $BASEDIR/$SampleID/BAM"
+    mkdir $BASEDIR/$SampleID/BAM
+    if [ $? -eq 0 ]
+    then
+        echo "Finished creating directory for $BASEDIR/$SampleID/BAM"
+    else
+        echo "Could not create directory for $BASEDIR/$SampleID/BAM"
+        exit 1
+    fi    
+fi
+
+if [ ! -f $BASEDIR/$SampleID/BAM/accepted_hits.bam ] || [ ! -f $BASEDIR/$SampleID/BAM/unmapped.bam ]
 then
     echo "$MAPPER mapping for $SampleID"
     if [ ! $sequences ]
@@ -44,3 +57,18 @@ then
     qsub -N h${SampleID}_map ~/GENEX-FB1/Bash/Tophat2.sh $sequences
 fi
 
+if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.sort.bam ]
+then
+    echo "Sorting $SampleID"
+    qsub -N h${SampleID}_sort -hold_jid h${SampleID}_map \
+      ~/GENEX-FB1/Bash/SamtoolsSort.sh \
+      $BASEDIR/$SampleID/BAM/accepted_hits.bam $BASEDIR/$SampleID/BAM/$SampleID.sort.bam
+fi   
+
+if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.sort.bam.bai ]
+then
+    echo "Indexing $SampleID"
+    qsub -N h${SampleID}_index -hold_jid h${SampleID}_sort \
+      ~/GENEX-FB1/Bash/SamtoolsIndex.sh \
+      $BASEDIR/$SampleID/${SampleID}_sort.bam     
+fi
