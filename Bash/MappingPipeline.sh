@@ -10,7 +10,7 @@
 SampleID=$1 
 BASEDIR=/c8000xd3/rnaseq-heath/Mappings
 seq_folder=$(grep -P "\s$SampleID(\s|$)"  ~/GENEX-FB1/Data/sequences.txt | cut -f 5 | head -1)
-sequences=$(for name in `grep -P "\s$SampleID(\s|$)"  ~/LabNotes/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
+sequences=$(for name in `grep -P "\s$SampleID(\s|$)"  ~/GENEX-FB1/Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
 
 echo "Starting mapping for $BASEDIR/$SampleID"
 if [ ! -d $BASEDIR/$SampleID ]
@@ -32,7 +32,7 @@ then
     if [ ! $sequences ]
     then
         echo "trying without gzip"
-        sequences=$(for name in `grep -P "\s$SampleID(\s|$)"  ~/LabNotes/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q; done)
+        sequences=$(for name in `grep -P "\s$SampleID(\s|$)"  ~/GENEX-FB1/Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q; done)
     fi
     if [ ! $sequences ]
     then
