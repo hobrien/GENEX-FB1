@@ -77,24 +77,78 @@ do
     fi
         
 
-    #bam_stat.py -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.chr.stats.txt
+    if [ ! -f $folder_path/$folder.chr.stats.txt ]
+    then
+        echo "calculating stats for $SampleID"
+        bam_stat.py -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.chr.stats.txt
+        if [ $? -eq 0 ]
+        then
+            echo "Finished calculating stats for $SampleID"
+        else
+            echo "Could not calculate stats for $SampleID"
+            exit 1
+        fi 
+    fi
 
     # determine the strand of experiment ("1++,1--,2+-,2-+" = first strand, "1+-,1-+,2++,2--" = second strand)
-    #infer_experiment.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.expt.txt
+    if [ ! -f $folder_path/$folder.expt.txt ]
+    then
+        echo "determining strand for $SampleID"
+        infer_experiment.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.expt.txt
+        if [ $? -eq 0 ]
+        then
+            echo "Finished determining strand for $SampleID"
+        else
+            echo "Could not determine strand for $SampleID"
+            exit 1
+        fi 
+    fi
 
     # plot distribution of insert sizes (size - total read length)
-    #inner_distance.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder -u 1000 -s 10 >/dev/null
+    if [ ! -f $folder_path/$folder.inner_distance_freq.txt ]
+    then
+        echo "determining insert sizes for $SampleID"
+        inner_distance.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder -u 1000 -s 10 >/dev/null
+        if [ $? -eq 0 ]
+        then
+            echo "Finished determining insert sizes for $SampleID"
+        else
+            echo "Could not determine insert sizes for $SampleID"
+            exit 1
+        fi 
+    fi
 
     # the necessary output from this is going to the log file, not to $folder.junction.txt
-    #junction_annotation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder  >  $folder_path/$folder.junction.txt
+    if [ ! -f $folder_path/$folder.junction.txt ]
+    then
+        echo "annotating junctions for $SampleID"
+        junction_annotation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder  >  $folder_path/$folder.junction.txt
+        if [ $? -eq 0 ]
+        then
+            echo "Finished annotating junctions for $SampleID"
+        else
+            echo "Could not annotate junctions for $SampleID"
+            exit 1
+        fi 
+    fi
 
-    #junction_saturation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
+    if [ ! -f $folder_path/$folder.junctionSaturation_plot.r ]
+    then
+        echo "Plotting junction saturation for $SampleID"
+        junction_saturation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
+        then
+            echo "Finished plotting junction saturation for $SampleID"
+        else
+            echo "Could not plot junction saturation for $SampleID"
+            exit 1
+        fi 
+    fi
 
     #read_distribution.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.dist.txt
 
     #read_duplication.py -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
 
-   #geneBody_coverage.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
+    #geneBody_coverage.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
 
 
     #deletion_profile.py -l 120 -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder

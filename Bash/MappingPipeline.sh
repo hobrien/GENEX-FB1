@@ -39,7 +39,7 @@ then
     fi    
 fi
 
-if [ ! -f $BASEDIR/$SampleID/BAM/accepted_hits.bam ] || [ ! -f $BASEDIR/$SampleID/BAM/unmapped.bam ]
+if [ ! -f $BASEDIR/$SampleID/accepted_hits.bam ] || [ ! -f $BASEDIR/$SampleID/unmapped.bam ]
 then
     echo "$MAPPER mapping for $SampleID"
     if [ ! $sequences ]
@@ -62,7 +62,7 @@ then
     echo "Sorting $SampleID"
     qsub -N h${SampleID}_sort -hold_jid h${SampleID}_map \
       ~/GENEX-FB1/Bash/SamtoolsSort.sh \
-      $BASEDIR/$SampleID/BAM/accepted_hits.bam $BASEDIR/$SampleID/BAM/$SampleID.sort.bam
+      $BASEDIR/$SampleID/accepted_hits.bam $BASEDIR/$SampleID/BAM/$SampleID.sort.bam
 fi   
 
 if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.sort.bam.bai ]
@@ -70,14 +70,23 @@ then
     echo "Indexing $SampleID"
     qsub -N h${SampleID}_index -hold_jid h${SampleID}_sort \
       ~/GENEX-FB1/Bash/SamtoolsIndex.sh \
-      $BASEDIR/$SampleID/${SampleID}_sort.bam     
+      $BASEDIR/$SampleID/BAM/${SampleID}.sort.bam     
 fi
 
-if [ ! -f $BASEDIR/$SampleID/$SampleID.ex.stats.txt ] | [ ! -f $BASEDIR/$SampleID/$SampleID.in.stats.txt ]
+if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.ex.bam ] | \
+   [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.in.bam ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.in.stats.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.ex.stats.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.chr.bam ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.chr.stats.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.expt.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.inner_distance_freq.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.junction.txt ] | \
+   [ ! -f $BASEDIR/$SampleID/$SampleID.junctionSaturation_plot.r ]
 then
     echo "Running RNAseqQC $SampleID"
     qsub -N h${SampleID}_stats -hold_jid h${SampleID}_index \
-       ~/GENEX-FB1/Bash/s/RNAseqQC.sh $BASEDIR/$SampleID/BAM/$SampleID.sort.bam   
+       ~/GENEX-FB1/Bash/RNAseqQC.sh $BASEDIR/$SampleID/BAM/$SampleID.sort.bam   
 fi
 
 if [ ! -f $BASEDIR/$SampleID/BAM/$SampleID.chr.counts.txt ]
