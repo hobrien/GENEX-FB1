@@ -7,12 +7,29 @@
 
 
 # see http://www.tldp.org/LDP/LG/issue18/bash.html for bash Parameter Substitution
+echo "Starting mapping for $BASEDIR/$SampleID"
+
 SampleID=$1 
 BASEDIR=/c8000xd3/rnaseq-heath/Mappings
 seq_folder=$(grep -P "\s$SampleID(\s|$)"  ~/GENEX-FB1/Data/sequences.txt | cut -f 5 | head -1)
 sequences=$(for name in `grep -P "\s$SampleID(\s|$)"  ~/GENEX-FB1/Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
+set -- $sequences
 
-echo "Starting mapping for $BASEDIR/$SampleID"
+file1=${1##*/}
+file2=${2##*/}
+echo ${file1%%.*}_fastqc.html
+
+if [ ! -f ${file1%%.*}_fastqc.html ]
+then
+    echo "running FASTQC on $1"
+    qsub ~/GENEX-FB1/Bash/FastQC.sh $1
+fi
+if [ ! -f ${file2%%.*}_fastqc.html ]
+then
+    echo "running FASTQC on $2"
+    qsub ~/GENEX-FB1/Bash/FastQC.sh $2
+fi
+
 if [ ! -d $BASEDIR/$SampleID ]
 then
     echo "Creating directory $BASEDIR/$SampleID"
