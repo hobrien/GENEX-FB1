@@ -110,8 +110,6 @@
 150616_D00125_0240_AC6U54ANXX_3_IL-TP-018_2	17049	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/17049	/c8000xd3/rnaseq-heath/Trimmed
 150616_D00125_0240_AC6U54ANXX_8_IL-TP-006_1	18983	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18983	/c8000xd3/rnaseq-heath/Trimmed
 150616_D00125_0240_AC6U54ANXX_8_IL-TP-006_2	18983	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18983	/c8000xd3/rnaseq-heath/Trimmed
-15533_2_TGACCA_L008_R1_001	15533_2	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/15533_2_April_2015	/c8000xd3/rnaseq-heath/Trimmed
-15533_2_TGACCA_L008_R2_001	15533_2	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/15533_2_April_2015	/c8000xd3/rnaseq-heath/Trimmed
 15533_TGACCA_L007_R1_001	15533	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/15533_Oct_2014	/c8000xd3/rnaseq-heath/Trimmed
 15533_TGACCA_L007_R2_001	15533	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/15533_Oct_2014	/c8000xd3/rnaseq-heath/Trimmed
 16548_CCGTCC_L007_R1_001	16548	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16548_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
