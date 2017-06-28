@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyr)
 library(ggplot2)
 library(dplyr)
+library(stringr)
 library(gridExtra)
 library(RColorBrewer)
 library(tufte)
@@ -67,6 +68,7 @@ RSeQCstats[,2:5] <- sapply(RSeQCstats[,2:5], function(x) formatC(as.numeric(x), 
 knitr::kable(
   RSeQCstats
 )
+write_tsv(RSeQCstats, "../Figures/read_numbers.txt")
 ```
 
 
@@ -104,7 +106,7 @@ for (folder in folders) {
                   )
              )
   temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
+  temp$sequencer <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
   RSeQCdistribution <- rbind(RSeQCdistribution, temp)
 }
 RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
@@ -113,6 +115,7 @@ RSeQCdistribution <- RSeQCdistribution[c(1,5,2,6,4,3)]
 knitr::kable(
   RSeQCdistribution
 )
+write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
 ```
 
 ## Strand
@@ -136,6 +139,7 @@ RSeQCstats <- spread(RSeQCstats, V1, V2)
 knitr::kable(
   RSeQCstats
 )
+write_tsv(RSeQCstats, "../Figures/read_strand.txt")
 ```
 
 ## Insert Size Distribution
@@ -156,13 +160,14 @@ for (folder in folders) {
                      )
   sample <- tail(strsplit(folder, '/')[[1]], 1)
   temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
+  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
   RSeQCstats <- rbind(RSeQCstats, temp)
 }
+write_tsv(RSeQCstats, "../Figures/read_distance.txt")
 ```
 
 ```{r dev.args = list(bg = 'transparent')}
-ggplot(RSeQCstats, aes(x=(V1+V2)/2, y=V3, colour=centre, group=sample)) +
+ggplot(RSeQCstats, aes(x=(V1+V2)/2, y=V3, colour=read_length, group=sample)) +
   geom_line() +
   ylab('reads') +
   xlab('inner distance') +
@@ -190,13 +195,14 @@ for (folder in folders) {
   sample <- tail(strsplit(folder, '/')[[1]], 1)
   temp$sample <- sample
   temp$ReadNumbers <- as.numeric(ReadNumbers[ReadNumbers$sample == sample,2])
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
+  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
   RSeQCstats <- rbind(RSeQCstats, temp)
 }
+write_tsv(RSeQCstats, "../Figures/junciton_sat.txt")
 ```
 
 ```{r dev.args = list(bg = 'transparent'), warning=FALSE}
-ggplot(RSeQCstats, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sample, colour=centre)) +
+ggplot(RSeQCstats, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sample, colour=read_length)) +
   geom_point() +
   #xlim(c(0,500)) +
   #scale_y_log10() +
