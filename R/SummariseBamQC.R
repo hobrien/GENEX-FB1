@@ -40,7 +40,7 @@ RSeQCstats <- spread(RSeQCstats, V1, V2)
 ReadNumbers <- RSeQCstats[,c(1,5)]
 RSeQCstats <- RSeQCstats[c(1,5,3,2,4)]
 RSeQCstats <- RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
-write_tsv(RSeQCstats, "../Figures/read_numbers.txt")
+write_tsv(RSeQCstats, "../Tables/read_numbers.txt")
 
 # read_distribution.py
 RSeQCdistribution <- data.frame()
@@ -69,7 +69,7 @@ RSeQCdistribution$V2 <- round(RSeQCdistribution$V2, 3)
 RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
 RSeQCdistribution <- RSeQCdistribution[c(1,5,3,4,2,6)]
 RSeQCdistribution <- RSeQCdistribution %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
-write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
+write_tsv(RSeQCdistribution, "../Tables/read_distribution.txt")
 
 #infer_experiment.py
 RSeQCexpt <- data.frame()
@@ -85,7 +85,7 @@ for (folder in folders) {
 RSeQCexpt <- spread(RSeQCexpt, V1, V2)
 # This assumes the same number of reads from each lane, which isn't true but is probably close enough
 RSeQCexpt <- RSeQCexpt %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("mean")
-write_tsv(RSeQCexpt, "../Figures/read_strand.txt")
+write_tsv(RSeQCexpt, "../Tables/read_strand.txt")
 
 #inner_distance.py
 RSeQCdistance <- data.frame()
@@ -102,7 +102,7 @@ for (folder in folders) {
 RSeQCdistance <- RSeQCdistance %>% mutate(sample = str_extract(sample, "^[^-]+"), 
                                           size = (V1+V2)/2) %>% 
   group_by(sample, size) %>% summarise(count=sum(V3))
-write_tsv(RSeQCdistance, "../Figures/read_distance.txt")
+write_tsv(RSeQCdistance, "../Tables/read_distance.txt")
 
 #junction_saturation.py
 RSeQCsat <- data.frame()
@@ -118,4 +118,4 @@ for (folder in folders) {
   temp$sample <- sample
   RSeQCsat <- rbind(RSeQCsat, temp)
 }
-write_tsv(RSeQCsat, "../Figures/junction_sat.txt")
+write_tsv(RSeQCsat, "../Tables/junction_sat.txt")
