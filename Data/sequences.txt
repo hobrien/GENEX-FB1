@@ -68,8 +68,6 @@
 150609_D00200_0263_BC7187ANXX_2_IL-TP-015_2	15468	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/15468	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_3_IL-TP-012_1	18666	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18666	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_3_IL-TP-012_2	18666	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18666	/c8000xd3/rnaseq-heath/Trimmed
-150609_D00200_0263_BC7187ANXX_3_IL-TP-018_1	18655-1	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18655	/c8000xd3/rnaseq-heath/Trimmed
-150609_D00200_0263_BC7187ANXX_3_IL-TP-018_2	18655-1	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18655	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_4_IL-TP-005_1	16640	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/16640	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_4_IL-TP-005_2	16640	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/16640	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_4_IL-TP-013_1	19043	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/19043	/c8000xd3/rnaseq-heath/Trimmed
@@ -80,8 +78,6 @@
 150609_D00200_0263_BC7187ANXX_5_IL-TP-016_2	15768	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/15768	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_7_IL-TP-015_1	18372	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18372	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_7_IL-TP-015_2	18372	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/18372	/c8000xd3/rnaseq-heath/Trimmed
-150609_D00200_0263_BC7187ANXX_7_IL-TP-016_1	16483-3	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/16483	/c8000xd3/rnaseq-heath/Trimmed
-150609_D00200_0263_BC7187ANXX_7_IL-TP-016_2	16483-3	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/16483	/c8000xd3/rnaseq-heath/Trimmed
 150610_D00125_0239_BC718AANXX_2_IL-TP-004_1	17333	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/17333	/c8000xd3/rnaseq-heath/Trimmed
 150610_D00125_0239_BC718AANXX_2_IL-TP-004_2	17333	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/17333	/c8000xd3/rnaseq-heath/Trimmed
 150610_D00125_0239_BC718AANXX_2_IL-TP-006_1	17629	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/17629	/c8000xd3/rnaseq-heath/Trimmed
