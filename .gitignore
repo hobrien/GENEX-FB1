@@ -37,14 +37,14 @@ Python/.ipynb_checkpoints/*
 #Stupid Mac files
 *.DS_Store
 
-# Results folder
-Results/*
+# Output files from scripts
 FastQC/*
-Mappings/*
-
-# Count data
-Shiny/GENEX-FB1/Data
 Counts/*
+Mappings/*
+Results/*
+Figures/*
+Documents/*
+Shiny/GENEX-FB1/Data
 
 # Shinyapp.io info
 Shiny/GENEX-FB1/rsconnect
