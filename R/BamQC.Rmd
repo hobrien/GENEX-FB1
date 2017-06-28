@@ -19,12 +19,9 @@ library(RColorBrewer)
 library(tufte)
 rm(list=ls())
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
-folders <- list.dirs("../Mappings", recursive=FALSE)
-folders<-folders[folders!="../Mappings/17193-1"]
-folders<-folders[folders!="../Mappings/17193-2"]
-LibraryInfo <- read.delim("../Data/SampleInfo.txt", 
-                     header=TRUE, stringsAsFactors=TRUE, sep='\t'
-                     )
+LibraryInfo <- read_tsv("../Data/SampleInfo.txt", 
+                        col_types = cols(.default = col_character())
+                       )
 ```
 
 # RSeQC
@@ -35,43 +32,11 @@ LibraryInfo <- read.delim("../Data/SampleInfo.txt",
 
 ``` {r }
 #bam_stat.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  #print(folder)
-  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
-  if(file.exists(paste(folder, ".ex.stats.txt", sep=""))){
-    temp <- read.delim(paste(folder, ".ex.stats.txt", sep=""), 
-                header=FALSE, stringsAsFactors=FALSE, skip=5, sep=':'
-                )
-    } else {
-    temp <- read.delim(paste(folder, ".chr.stats.txt", sep=""), 
-                         header=FALSE, stringsAsFactors=FALSE, skip=5, sep=':'
-                         )
-    }
-  temp[4,2] <-strsplit(temp[4,1], ' +')[[1]][4]
-  temp[4,1] <- 'Non primary hits'
-  temp <- temp[c(6,7,14),]
-  temp2 <- read.delim(paste(folder, ".in.stats.txt", sep=""), 
-                     header=FALSE, stringsAsFactors=FALSE, skip=5, sep=':'
-                     )
-  temp2[4,2] <-strsplit(temp[4,1], ' +')[[1]][4]
-  temp2[4,1] <- 'Non primary hits'
-  temp <-rbind(temp, c("rDNA",sum(as.numeric(temp2[c(6,7),2]))))
-  temp[,1] <- c("Multimapped", "Unique", "Paired", "rDNA")
-  temp$sample <- tail(strsplit(folder, '/')[[1]], 1)
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-RSeQCstats <- mutate(RSeQCstats, V2=as.numeric(V2))
-RSeQCstats <- spread(RSeQCstats, V1, V2)
-#mutate(RSeQCstats, Perc_rDNA = as.numeric(rDNA)/(as.numeric(Unique)+as.numeric(Multimapped)+as.numeric(rDNA))) %>% arrange(Perc_rDNA)
-ReadNumbers <- RSeQCstats[,c(1,5)]
-RSeQCstats <- RSeQCstats[c(1,5,3,2,4)]
-RSeQCstats <- RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
-RSeQCstats[,2:5] <- sapply(RSeQCstats[,2:5], function(x) formatC(as.numeric(x), format='d', big.mark=','))
+RSeQCstats <- read_tsv("../Figures/read_numbers.txt", col_types = cols(sample = 'c'))
+RSeQCstats <- dplyr::select(LibraryInfo, sample=Sample, `Read Length`) %>% full_join(RSeQCstats)
 knitr::kable(
-  RSeQCstats 
+  bind_cols(RSeQCstats[,1:2], as.data.frame(sapply(RSeQCstats[,3:6], function(x) formatC(as.numeric(x), format='d', big.mark=','))))
 )
-write_tsv(RSeQCstats, "../Figures/read_numbers.txt")
 ```
 
 
@@ -87,38 +52,16 @@ write_tsv(RSeQCstats, "../Figures/read_numbers.txt")
 
 ``` {r }
 #read_distribution.py
-RSeQCdistribution <- data.frame()
-ReadNumbers$ExpressedTags = NA
-for (folder in folders) {
-  #print(folder)
-  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
-  sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp <- read.delim(paste(folder, ".dist.txt", sep=""), 
-                           header=TRUE, stringsAsFactors=FALSE, skip=4, sep=''
-                     )
-  temp <- temp[-11,]
-  tag_total <- sum(temp[c(1,2,3,4,7,10),3])
-  ReadNumbers[ReadNumbers$sample == sample,]$ExpressedTags <- sum(temp[c(1,2,3),3])
-  temp <- data.frame(V1 = c("Tags_per_read", "CDS", "UTR", "Intron", "Intergenic"), 
-                     V2=c(
-                  tag_total/as.numeric(ReadNumbers[ReadNumbers$sample == sample,]$Unique),
-                  temp[1,3]/tag_total, 
-                  sum(as.numeric(temp[c(2,3),3]))/tag_total,
-                  temp[4,3]/tag_total,
-                  sum(as.numeric(temp[c(7,10),3]))/tag_total
-                  )
-             )
-  temp$sample <- sample
-  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
-  RSeQCdistribution <- rbind(RSeQCdistribution, temp)
-}
-RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
-RSeQCdistribution <- RSeQCdistribution[c(1,5,2,6,4,3)]
-
+RSeQCdistribution <- read_tsv("../Figures/read_distribution.txt", col_types = cols(sample = 'c'))
+RSeQCdistribution <- dplyr::select(LibraryInfo, sample=Sample, `Read Length`) %>% full_join(RSeQCdistribution)
+dplyr::select(RSeQCstats, sample, Unique) %>% 
+  full_join(RSeQCdistribution) %>%
+  mutate(tags_per_read=`Total Tags`/Unique) %>%
+  dplyr::select(sample, `Read Length`, tags_per_read, CDS, UTR, Intron, Intergenic)
 knitr::kable(
-  RSeQCdistribution %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample, read_length) %>% summarise_each("sum")
+  RSeQCdistribution
 )
-write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
+
 
 ```
 
@@ -127,23 +70,12 @@ write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
 `r margin_note("- Data consistent with second-strand experiment")`
 
 ```{r }
-#infer_experiment.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
-  temp <- read.delim(paste(folder, ".expt.txt", sep=""), 
-                     skip=3, header=FALSE, sep=':'
-                     )
-  temp$sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp$V1 <- c("Ambiguous", "First Strand", "Second Strand")
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-RSeQCstats <- spread(RSeQCstats, V1, V2)
+RSeQCexpt <- read_tsv("../Figures/read_strand.txt", col_types = cols(sample = 'c'))
+RSeQCexpt <- dplyr::select(LibraryInfo, sample=Sample, `Read Length`) %>% full_join(RSeQCexpt)
 
 knitr::kable(
-    RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
+    RSeQCexpt
 )
-write_tsv(RSeQCstats, "../Figures/read_strand.txt")
 
 ```
 
@@ -154,25 +86,12 @@ write_tsv(RSeQCstats, "../Figures/read_strand.txt")
 `r margin_note("- This indicates that fragment size tends to be around 125-150 bp")`
 
 
-```{r include=FALSE}
-#inner_distance.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
-  #print(folder)
-  temp <- read.delim(paste(folder, ".inner_distance_freq.txt", sep=""),
-                     header=FALSE
-                     )
-  sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp$sample <- sample
-  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-write_tsv(RSeQCstats, "../Figures/read_distance.txt")
-```
 
 ```{r dev.args = list(bg = 'transparent')}
-ggplot(RSeQCstats, aes(x=(V1+V2)/2, y=V3, colour=read_length, group=sample)) +
+RSeQCdistance <- read_tsv("../Figures/read_distance.txt", col_types = cols(sample = 'c'))
+RSeQCdistance <- dplyr::select(LibraryInfo, sample=Sample, `Read Length`) %>% full_join(RSeQCdistance)
+
+ggplot(RSeQCdistance, aes(x=size, y=count, colour=`Read Length`, group=sample)) +
   geom_line() +
   ylab('reads') +
   xlab('inner distance') +
@@ -186,35 +105,22 @@ ggplot(RSeQCstats, aes(x=(V1+V2)/2, y=V3, colour=read_length, group=sample)) +
 
 `r margin_note("- It looks like both known and novel splice sites continue to be found")`
 
-```{r include=FALSE}
-#junction_saturation.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
-  eval(parse(file = paste(folder, ".junctionSaturation_plot.r", sep=""))[2:5])
-  temp<-rbind(
-              data.frame(percent_reads=x, junctions=z, Category='All'),
-              data.frame(percent_reads=x, junctions=y, Category='Known'),
-              data.frame(percent_reads=x, junctions=w, Category='Novel')
-              )
-  sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp$sample <- sample
-  temp$ReadNumbers <- as.numeric(ReadNumbers[ReadNumbers$sample == sample,2])
-  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-write_tsv(RSeQCstats, "../Figures/junciton_sat.txt")
-```
-
 ```{r dev.args = list(bg = 'transparent'), warning=FALSE}
-ggplot(RSeQCstats, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sample, colour=read_length)) +
+RSeQCsat <- read_tsv("../Figures/junction_sat.txt", col_types = cols(sample = 'c'))
+RSeQCsat <- mutate(RSeQCsat, BrainBankID=str_extract(sample, "^[^-]+")) %>%
+  full_join(dplyr::select(LibraryInfo, BrainBankID=Sample, `Read Length`)) %>% 
+  full_join(select(RSeQCstats, BrainBankID=sample, ReadNumbers=Unique)) %>%
+  dplyr::select(-BrainBankID)
+
+ggplot(RSeQCsat, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sample, colour=`Read Length`)) +
   geom_point() +
   #xlim(c(0,500)) +
   #scale_y_log10() +
   scale_colour_brewer(type = "qual", palette = 6) +
   main_theme() +
-  theme(legend.position=c(.8,.9)) +
+  theme(legend.position=c(.9,.9)) +
   facet_wrap(~ Category, scales='free') +
+  theme(axis.text.x=element_text(angle=-90)) +
   xlab("Number of Reads")
-  ```
+```
   
