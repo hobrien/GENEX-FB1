@@ -61,6 +61,7 @@ for (folder in folders) {
   temp$sample <- tail(strsplit(folder, '/')[[1]], 1)
   RSeQCstats <- rbind(RSeQCstats, temp)
 }
+RSeQCstats <- mutate(RSeQCstats, V2=as.numeric(V2))
 RSeQCstats <- spread(RSeQCstats, V1, V2)
 #mutate(RSeQCstats, Perc_rDNA = as.numeric(rDNA)/(as.numeric(Unique)+as.numeric(Multimapped)+as.numeric(rDNA))) %>% arrange(Perc_rDNA)
 ReadNumbers <- RSeQCstats[,c(1,5)]
