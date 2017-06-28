@@ -24,43 +24,43 @@ do
 #http://rseqc.sourceforge.net/
     if [ ! -f $folder_path/BAM/$folder.in.bam ] | [ ! -f $folder_path/BAM/$folder.ex.bam ]
     then
-        echo "Splitting BAM for $SampleID"
+        echo "Splitting BAM for $folder"
         split_bam.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Sequence/AbundantSequences/humRibosomal.bed -i $dataset -o $folder_path/BAM/$folder   
         if [ $? -eq 0 ]
         then
-            echo "Finished splitting BAM for $SampleID"
+            echo "Finished splitting BAM for $folder"
         else
-            echo "Could not split BAM for $SampleID"
+            echo "Could not split BAM for $folder"
             exit 1
         fi 
     fi
     if [ ! -f $folder_path/$folder.in.stats.txt ]
     then
-        echo "Running bam_stat on ribosomal reads for $SampleID"
+        echo "Running bam_stat on ribosomal reads for $folder"
         bam_stat.py -i $folder_path/BAM/$folder.in.bam > $folder_path/$folder.in.stats.txt
         if [ $? -eq 0 ]
         then
-            echo "Finished running bam_stat on ribosomal reads for $SampleID"
+            echo "Finished running bam_stat on ribosomal reads for $folder"
         else
-            echo "Could not run bam_stat on ribosomal reads for $SampleID"
+            echo "Could not run bam_stat on ribosomal reads for $folder"
             exit 1
         fi 
     fi
     if [ ! -f $folder_path/$folder.ex.stats.txt ]
     then
-        echo "Running bam_stat on non-ribosomal reads for $SampleID"
+        echo "Running bam_stat on non-ribosomal reads for $folder"
         bam_stat.py -i $folder_path/BAM/$folder.ex.bam > $folder_path/$folder.ex.stats.txt
         if [ $? -eq 0 ]
         then
-            echo "Finished running bam_stat on non-ribosomal reads for $SampleID"
+            echo "Finished running bam_stat on non-ribosomal reads for $folder"
         else
-            echo "Could not run bam_stat on non-ribosomal reads for $SampleID"
+            echo "Could not run bam_stat on non-ribosomal reads for $folder"
             exit 1
         fi 
     fi
     if [ ! -f $folder_path/BAM/$folder.chr.bam ]
     then
-        echo "Extracting chromosome reads for $SampleID"
+        echo "Extracting chromosome reads for $folder"
         samtools index $folder_path/BAM/$folder.ex.bam
         samtools view -bh $folder_path/BAM/$folder.ex.bam \
           chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY \
@@ -69,9 +69,9 @@ do
 
         if [ $? -eq 0 ]
         then
-            echo "Finished extracting chromosome reads for $SampleID"
+            echo "Finished extracting chromosome reads for $folder"
         else
-            echo "Could not extract chromosome reads for $SampleID"
+            echo "Could not extract chromosome reads for $folder"
             exit 1
         fi 
     fi
@@ -79,13 +79,13 @@ do
 
     if [ ! -f $folder_path/$folder.chr.stats.txt ]
     then
-        echo "calculating stats for $SampleID"
+        echo "calculating stats for $folder"
         bam_stat.py -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.chr.stats.txt
         if [ $? -eq 0 ]
         then
-            echo "Finished calculating stats for $SampleID"
+            echo "Finished calculating stats for $folder"
         else
-            echo "Could not calculate stats for $SampleID"
+            echo "Could not calculate stats for $folder"
             exit 1
         fi 
     fi
@@ -93,13 +93,13 @@ do
     # determine the strand of experiment ("1++,1--,2+-,2-+" = first strand, "1+-,1-+,2++,2--" = second strand)
     if [ ! -f $folder_path/$folder.expt.txt ]
     then
-        echo "determining strand for $SampleID"
+        echo "determining strand for $folder"
         infer_experiment.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.expt.txt
         if [ $? -eq 0 ]
         then
-            echo "Finished determining strand for $SampleID"
+            echo "Finished determining strand for $folder"
         else
-            echo "Could not determine strand for $SampleID"
+            echo "Could not determine strand for $folder"
             exit 1
         fi 
     fi
@@ -107,13 +107,13 @@ do
     # plot distribution of insert sizes (size - total read length)
     if [ ! -f $folder_path/$folder.inner_distance_freq.txt ]
     then
-        echo "determining insert sizes for $SampleID"
+        echo "determining insert sizes for $folder"
         inner_distance.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder -u 1000 -s 10 >/dev/null
         if [ $? -eq 0 ]
         then
-            echo "Finished determining insert sizes for $SampleID"
+            echo "Finished determining insert sizes for $folder"
         else
-            echo "Could not determine insert sizes for $SampleID"
+            echo "Could not determine insert sizes for $folder"
             exit 1
         fi 
     fi
@@ -121,30 +121,42 @@ do
     # the necessary output from this is going to the log file, not to $folder.junction.txt
     if [ ! -f $folder_path/$folder.junction.txt ]
     then
-        echo "annotating junctions for $SampleID"
+        echo "annotating junctions for $folder"
         junction_annotation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder  >  $folder_path/$folder.junction.txt
         if [ $? -eq 0 ]
         then
-            echo "Finished annotating junctions for $SampleID"
+            echo "Finished annotating junctions for $folder"
         else
-            echo "Could not annotate junctions for $SampleID"
+            echo "Could not annotate junctions for $folder"
             exit 1
         fi 
     fi
 
     if [ ! -f $folder_path/$folder.junctionSaturation_plot.r ]
     then
-        echo "Plotting junction saturation for $SampleID"
+        echo "Plotting junction saturation for $folder"
         junction_saturation.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
+        if [ $? -eq 0 ]
         then
-            echo "Finished plotting junction saturation for $SampleID"
+            echo "Finished plotting junction saturation for $folder"
         else
-            echo "Could not plot junction saturation for $SampleID"
+            echo "Could not plot junction saturation for $folder"
             exit 1
         fi 
     fi
 
-    #read_distribution.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.dist.txt
+    if [ ! -f $folder_path/$folder.dist.txt ]
+    then
+        echo "Calculating read distribution for $folder"
+        read_distribution.py -r /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed -i $folder_path/BAM/$folder.chr.bam > $folder_path/$folder.dist.txt
+        if [ $? -eq 0 ]
+        then
+            echo "Finished calculating read distribution for $folder"
+        else
+            echo "Could not calculate read distribution for $folder"
+            exit 1
+        fi 
+    fi
 
     #read_duplication.py -i $folder_path/BAM/$folder.chr.bam -o $folder_path/$folder
 
