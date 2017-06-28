@@ -16,9 +16,11 @@ library(gridExtra)
 library(RColorBrewer)
 library(tufte)
 rm(list=ls())
-source("~/LabNotes/R/FormatGGplot.R")
-folders <- list.dirs("/c8000xd3/rnaseq-heath/Mappings", recursive=FALSE)
-LibraryInfo <- read.delim("~/GENEX-FB1/Data/SampleInfo.txt", 
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
+folders <- list.dirs("../Mappings", recursive=FALSE)
+folders<-folders[folders!="../Mappings/17193-1"]
+folders<-folders[folders!="../Mappings/17193-2"]
+LibraryInfo <- read.delim("../Data/SampleInfo.txt", 
                      header=TRUE, stringsAsFactors=TRUE, sep='\t'
                      )
 ```
@@ -34,6 +36,7 @@ LibraryInfo <- read.delim("~/GENEX-FB1/Data/SampleInfo.txt",
 RSeQCstats <- data.frame()
 for (folder in folders) {
   #print(folder)
+  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
   if(file.exists(paste(folder, ".ex.stats.txt", sep=""))){
     temp <- read.delim(paste(folder, ".ex.stats.txt", sep=""), 
                 header=FALSE, stringsAsFactors=FALSE, skip=5, sep=':'
@@ -82,6 +85,8 @@ knitr::kable(
 RSeQCdistribution <- data.frame()
 ReadNumbers$ExpressedTags = NA
 for (folder in folders) {
+  #print(folder)
+  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
   sample <- tail(strsplit(folder, '/')[[1]], 1)
   temp <- read.delim(paste(folder, ".dist.txt", sep=""), 
                            header=TRUE, stringsAsFactors=FALSE, skip=4, sep=''
@@ -99,7 +104,7 @@ for (folder in folders) {
                   )
              )
   temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == sample,5]
+  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
   RSeQCdistribution <- rbind(RSeQCdistribution, temp)
 }
 RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
@@ -118,6 +123,7 @@ knitr::kable(
 #infer_experiment.py
 RSeQCstats <- data.frame()
 for (folder in folders) {
+  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
   temp <- read.delim(paste(folder, ".expt.txt", sep=""), 
                      skip=3, header=FALSE, sep=':'
                      )
@@ -143,13 +149,14 @@ knitr::kable(
 #inner_distance.py
 RSeQCstats <- data.frame()
 for (folder in folders) {
+  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
   #print(folder)
   temp <- read.delim(paste(folder, ".inner_distance_freq.txt", sep=""),
                      header=FALSE
                      )
   sample <- tail(strsplit(folder, '/')[[1]], 1)
   temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == sample,5]
+  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
   RSeQCstats <- rbind(RSeQCstats, temp)
 }
 ```
@@ -160,85 +167,8 @@ ggplot(RSeQCstats, aes(x=(V1+V2)/2, y=V3, colour=centre, group=sample)) +
   ylab('reads') +
   xlab('inner distance') +
   scale_colour_brewer(type = "qual", palette = 6) +
-  tufte_theme() +
+  main_theme() +
   theme(legend.position=c(.8,.8))
-
-```
-
-## Transcript Read Coverage
-
-`r margin_note("- Looks good. Steep drop-offs at the ends, especially 5'")`
-`r margin_note("- I'm still a bit surprised about the spread in these values because I've normalised by the number of tags that map to CDS or UTR features. I guess there can be some variation in the size of the tags, but this still seems like a lot")`
-
-```{r dev.args = list(bg = 'transparent')}
-#geneBody_coverage.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  #print(folder)
-  temp <- read.delim(paste(folder, ".geneBodyCoverage.txt", sep=""),
-                     header=FALSE
-                     )
-  temp <-  as.data.frame(t(temp[,-1]))
-  sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == sample,5]
-  temp$V2 <- temp$V2
-  temp$ReadNumbers <- as.numeric(ReadNumbers[ReadNumbers$sample == sample,]$ExpressedTags)
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-
-#ggplot(subset(RSeQCstats, sample != 17175), aes(x=V1, y=V2/ReadNumbers, colour=centre, group=sample)) +
-ggplot(RSeQCstats, aes(x=V1, y=V2/ReadNumbers, colour=centre, group=sample)) +
-  geom_line() +
-  ylab('reads') +
-  tufte_theme() +
-  theme(legend.position=c(0.1,.9)) +
-  scale_colour_brewer(type = "qual", palette = 6) +
-  xlab('transcript percentile') +
-  ylab("proportion of expressed tags")
-  
-```
-
-## Sequence Duplication
-
-`r margin_note("- Plenty of duplication")`
-`r margin_note("- Probably not unexpected in this case")`
-`r margin_note("- Duplication higher for Exeter samples")`
-
-```{r include=FALSE}
-#read_duplication.py
-RSeQCstats <- data.frame()
-for (folder in folders) {
-  eval(parse(file = paste(folder, ".DupRate_plot.r", sep=""))[2:6])
-  temp <- rbind(data.frame(Reads=pos_uniqRead, 
-                            Duplication_level=pos_occ, 
-                            Method='Position-based'
-                            ),
-                 data.frame(Reads=seq_uniqRead, 
-                            Duplication_level=seq_occ, 
-                            Method='Sequence-based'
-                            )
-                )
-  sample <- tail(strsplit(folder, '/')[[1]], 1)
-  temp$sample <- sample
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == sample,5]
-  temp$ReadNumbers <- as.numeric(ReadNumbers[ReadNumbers$sample == sample,]$Unique)
-  RSeQCstats <- rbind(RSeQCstats, temp)
-}
-
-```
-
-```{r dev.args = list(bg = 'transparent'), warning=FALSE}
-ggplot(RSeQCstats, aes(x=Duplication_level, y=Reads/ReadNumbers, colour=centre, group=sample)) +
-  geom_point() +
-  xlim(c(0,500)) +
-  scale_y_log10() +
-  tufte_theme() +
-  theme(legend.position=c(.8,.8)) +
-  scale_colour_brewer(type = "qual", palette = 6) +
-  facet_wrap(~ Method) +
-  ylab("Proportion of Reads")
-
 
 ```
 
@@ -250,6 +180,7 @@ ggplot(RSeQCstats, aes(x=Duplication_level, y=Reads/ReadNumbers, colour=centre, 
 #junction_saturation.py
 RSeQCstats <- data.frame()
 for (folder in folders) {
+  folder=paste(folder, str_extract(folder, '[^/]+$'), sep='/')
   eval(parse(file = paste(folder, ".junctionSaturation_plot.r", sep=""))[2:5])
   temp<-rbind(
               data.frame(percent_reads=x, junctions=z, Category='All'),
@@ -259,7 +190,7 @@ for (folder in folders) {
   sample <- tail(strsplit(folder, '/')[[1]], 1)
   temp$sample <- sample
   temp$ReadNumbers <- as.numeric(ReadNumbers[ReadNumbers$sample == sample,2])
-  temp$centre <- LibraryInfo[LibraryInfo$Sample == sample,5]
+  temp$centre <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
   RSeQCstats <- rbind(RSeQCstats, temp)
 }
 ```
@@ -270,7 +201,7 @@ ggplot(RSeQCstats, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sampl
   #xlim(c(0,500)) +
   #scale_y_log10() +
   scale_colour_brewer(type = "qual", palette = 6) +
-  tufte_theme() +
+  main_theme() +
   theme(legend.position=c(.8,.9)) +
   facet_wrap(~ Category, scales='free') +
   xlab("Number of Reads")
