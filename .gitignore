@@ -39,6 +39,8 @@ Python/.ipynb_checkpoints/*
 
 # Results folder
 Results/*
+FastQC/*
+Mappings/*
 
 # Count data
 Shiny/GENEX-FB1/Data
