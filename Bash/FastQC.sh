@@ -5,6 +5,5 @@
 #$ -S /bin/bash
 #
 echo "running fastQC on $@"
-#zcat '@$' | ~/src/FastQC/fastqc --outdir=/home/mpmho/FastQC stdin
-~/src/FastQC/fastqc --outdir=/home/mpmho/FastQC $@
+~/src/FastQC/fastqc --outdir=/c8000xd3/rnaseq-heath/GENEX-FB1/FastQC $@
 echo "finished running fastQC on $@"
