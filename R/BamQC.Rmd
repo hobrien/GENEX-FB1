@@ -67,7 +67,7 @@ ReadNumbers <- RSeQCstats[,c(1,5)]
 RSeQCstats <- RSeQCstats[c(1,5,3,2,4)]
 RSeQCstats[,2:5] <- sapply(RSeQCstats[,2:5], function(x) formatC(as.numeric(x), format='d', big.mark=','))
 knitr::kable(
-  RSeQCstats
+  RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
 )
 write_tsv(RSeQCstats, "../Figures/read_numbers.txt")
 ```
@@ -107,14 +107,14 @@ for (folder in folders) {
                   )
              )
   temp$sample <- sample
-  temp$sequencer <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),5]
+  temp$read_length <- LibraryInfo[LibraryInfo$Sample == str_extract(sample, '^[^-]+'),6]
   RSeQCdistribution <- rbind(RSeQCdistribution, temp)
 }
 RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
 RSeQCdistribution <- RSeQCdistribution[c(1,5,2,6,4,3)]
 
 knitr::kable(
-  RSeQCdistribution
+  RSeQCdistribution %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
 )
 write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
 ```
@@ -138,7 +138,7 @@ for (folder in folders) {
 RSeQCstats <- spread(RSeQCstats, V1, V2)
 
 knitr::kable(
-  RSeQCstats
+    RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
 )
 write_tsv(RSeQCstats, "../Figures/read_strand.txt")
 ```
