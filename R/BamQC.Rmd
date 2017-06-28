@@ -114,9 +114,10 @@ RSeQCdistribution <- spread(RSeQCdistribution, V1, V2)
 RSeQCdistribution <- RSeQCdistribution[c(1,5,2,6,4,3)]
 
 knitr::kable(
-  RSeQCdistribution %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
+  RSeQCdistribution %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample, read_length) %>% summarise_each("sum")
 )
 write_tsv(RSeQCdistribution, "../Figures/read_distribution.txt")
+
 ```
 
 ## Strand
@@ -141,6 +142,7 @@ knitr::kable(
     RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
 )
 write_tsv(RSeQCstats, "../Figures/read_strand.txt")
+
 ```
 
 ## Insert Size Distribution
