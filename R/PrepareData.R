@@ -12,14 +12,33 @@ gene_info <- read_tsv("Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
 
-counts <- read_delim("Results/MvsF_12_20_PCW_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(Id=str_extract(Id, '^[^.]+'))
-  
 
-right_join(gene_info, dplyr::select(counts, Id, starts_with('norm'))) %>% 
-  write_tsv("Shiny/GENEX-FB1/Data/counts.txt")
-right_join(gene_info, dplyr::select(counts, Id, starts_with('norm'))) %>% 
-  write_tsv("Tables/raw_counts.txt")
+counts12_20 <- read_delim("Results/MvsF_12_20_PCW_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts12_20.txt")
+counts12 <- read_delim("Results/MvsF_12_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts12, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts12.txt")
+counts13 <- read_delim("Results/MvsF_13_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts13, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts13.txt")
+counts14 <- read_delim("Results/MvsF_14_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts14, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts14.txt")
+counts15_17 <- read_delim("Results/MvsF_15_17_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts15_17, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts15_17.txt")
+counts17_20 <- read_delim("Results/MvsF_17_20_FDR_0.1/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(Id=str_extract(Id, '^[^.]+'))
+right_join(gene_info, dplyr::select(counts17_20, Id, starts_with('norm'))) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/counts17_20.txt")
+
+
 
 fittedBias <- read_delim("Results/MvsF_12_20_PCW_FDR_0.1/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
