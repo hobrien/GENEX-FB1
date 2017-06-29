@@ -7,16 +7,16 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 library(tidyverse)
 library(stringr)
 library(gridExtra)
 library(clusterProfiler)
 library(xlsx)
-source("../Shiny/GENEX-FB1/FormatGGplot.R")
-dir.create("../Results")
+source("Shiny/GENEX-FB1/FormatGGplot.R")
 
-fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+fittedBias <- read_delim("Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
          ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
@@ -25,12 +25,12 @@ fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_doub
 fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
 fittedBias <-  filter(fittedBias, ageBin != '12-19')
 
-gene_sets <-read_delim("../Data/GeneSets.txt", 
+gene_sets <-read_delim("Data/GeneSets.txt", 
                          "\t", escape_double = FALSE, col_names=c('gene_name', 'set', 'reference', 'Id'), 
                          trim_ws = TRUE)
-counts <- read_delim("../Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+counts <- read_delim("Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-target <- read_delim("../Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+target <- read_delim("Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(label=as.character(Sample))
 
 PlotFC <- function(genes, title) {
@@ -54,7 +54,7 @@ Fig1a <- fittedBias %>% filter(padj < .1 ) %>%
   ggplot(aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
   facet_grid(. ~ ageBin) +
     figure_theme() +
-    scale_y_continuous(breaks=seq(100,1000,100)) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
     scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
     theme(strip.switch.pad.grid = unit(10, 'cm')) +
     ylab('Number sex-biased genes (FDR<0.1)') +
@@ -76,10 +76,10 @@ Fig1b <- ggplot(fittedBias, aes(x=ageBin, y=log2FoldDiff, group=Id)) +
     theme(legend.position='right')
 
 
-png(file="../Results/Fig1.png", bg="transparent", width=183, height=70, units='mm', res=300)
+png(file="Figures/Fig1.png", bg="transparent", width=183, height=70, units='mm', res=300)
 grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
 dev.off()
-pdf(file="../Results/Fig1.pdf", 7.2, 3)
+pdf(file="Figures/Fig1.pdf", 7.2, 3)
 grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
 dev.off()
 
@@ -98,11 +98,11 @@ FR <- gene_sets %>%
   filter(set=='cluster9' & gene_name != 'RPS4Y1') %>%
   inner_join(fittedBias)
 group_by(FR, ageBin) %>% summarise(n=n())
-png(file="../Results/Fig2.png", bg="transparent", width=183, 
+png(file="Figures/Fig2.png", bg="transparent", width=183, 
     height=70, units='mm', res=300)
 grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
 dev.off()
-pdf(file="../Results/Fig2.pdf", 7.2, 3)
+pdf(file="Figures/Fig2.pdf", 7.2, 3)
 grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
 dev.off()
 
@@ -146,10 +146,10 @@ Fig3a <- PlotTimepoint('GABRA1', counts, fittedBias, target, '14', 'GABRA1')
 Fig3b <- PlotTimepoint('GRIN2A', counts, fittedBias, target, '14', 'GRIN2A')
 Fig3c <- PlotTimepoint('NES', counts, fittedBias, target, '14', 'NES')
 Fig3d <- PlotTimepoint('EOMES', counts, fittedBias, target, '14', 'EOMES')
-png(file="../Results/Fig3.png", bg="transparent", width=183, height=140, units='mm', res=300)
+png(file="Figures/Fig3.png", bg="transparent", width=183, height=140, units='mm', res=300)
 grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
 dev.off()
-pdf(file="../Results/Fig3.pdf", 7.2, 5.5)
+pdf(file="Figures/Fig3.pdf", 7.2, 5.5)
 grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
 dev.off()
 
@@ -186,10 +186,10 @@ p2 <- ggplot(target, aes(x=age_bin, fill=Sex)) +
   scale_fill_brewer(type = "qual", palette = 6) +
   ggtitle('B.')
 
-pdf(file="../Results/FigS1.pdf", 7.2, 5.5)
+pdf(file="Figures/FigS1.pdf", 7.2, 5.5)
 grid.arrange(p1, p2, ncol=2)
 dev.off()
-png(file="../Results/FigS1.png", bg="transparent", width=183, height=140, units='mm', res=300)
+png(file="Figures/FigS1.png", bg="transparent", width=183, height=140, units='mm', res=300)
 grid.arrange(p1, p2, ncol=2)
 dev.off()
 grid.arrange(p1, p2, ncol=2)
@@ -213,14 +213,14 @@ NPC <- gene_sets %>%
   inner_join(fittedBias)
 group_by(NPC, ageBin) %>% summarise(n=n())
 
-png(file="../Results/FigS2.png", bg="transparent", width=183, 
+png(file="Figures/FigS2.png", bg="transparent", width=183, 
     height=210, units='mm', res=300)
 grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
              PlotFC(RG, 'B. Radial glia genes'),
              PlotFC(Neuronal, 'C. Fetal neuron genes'), 
              ncol=1)
 dev.off()
-pdf(file="../Results/FigS2.pdf", 7.2, 9)
+pdf(file="Figures/FigS2.pdf", 7.2, 9)
 grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
              PlotFC(RG, 'B. Radial glia genes'),
              PlotFC(Neuronal, 'C. Fetal neuron genes'), 
@@ -259,7 +259,7 @@ Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>%
 #For some mysterious reason, enricher is correcting for 4 tests even though there are clearly 5 gene sets being tested.
 Enrichment$p.adjust <- p.adjust(Enrichment$pvalue, method='bonferroni', n=10)
 
-write_tsv(Enrichment, "../Results/Enrichment14.txt")
+write_tsv(Enrichment, "Tables/Enrichment14.txt")
 Enrichment
 ```
 
@@ -286,7 +286,7 @@ Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>%
 
 #Need to correct for test because 2 sets of DE genes
 Enrichment$p.adjust <- p.adjust(Enrichment$pvalue, method='bonferroni', n=2)
-write_tsv(Enrichment, "../Results/EnrichmentAll.txt")
+write_tsv(Enrichment, "Tables/EnrichmentAll.txt")
 Enrichment
 ```
 
@@ -307,14 +307,14 @@ DEG12_19 <- fittedBiasAll %>% filter(padj<0.1) %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG12_19), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS1')
 ```
 
 Supplementary Table 2
 ```{r}
-previous <- read_tsv("../Data/previous_findings.txt")
+previous <- read_tsv("Data/previous_findings.txt")
 sig_res <- fittedBiasAll %>% 
   bind_rows(fittedBias) %>% 
   filter(padj < 0.1) %>%
@@ -334,7 +334,7 @@ sig_res <- fittedBiasAll %>%
   left_join(previous)
 
 write.xlsx2(as.data.frame(sig_res), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS2',
             append=TRUE)
@@ -342,9 +342,9 @@ write.xlsx2(as.data.frame(sig_res),
 
 Supplementary Table 3
 ```{r}
-Xinactivation <- read_tsv('../Data/Xinactivation.txt')
+Xinactivation <- read_tsv('Data/Xinactivation.txt')
 write.xlsx2(as.data.frame(Xinactivation), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS3',
             append=TRUE)
@@ -352,16 +352,16 @@ write.xlsx2(as.data.frame(Xinactivation),
 
 Supplementary Tables 4 & 5
 ```{r}
-GO_M_all <- read_tsv('../Data/DAVID_M12_19.txt')
+GO_M_all <- read_tsv('Data/DAVID_M12_19.txt')
 write.xlsx2(as.data.frame(GO_M_all), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS4',
             append=TRUE)
 
-GO_F_all <- read_tsv('../Data/DAVID_F12_19.txt')
+GO_F_all <- read_tsv('Data/DAVID_F12_19.txt')
 write.xlsx2(as.data.frame(GO_F_all), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS5',
             append=TRUE)
@@ -385,7 +385,7 @@ DEG12 <- fittedBias %>% filter(padj<0.1 & ageBin == 12) %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG12), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS6',
             append=TRUE)
@@ -405,7 +405,7 @@ DEG13 <- fittedBias %>% filter(padj<0.1 & ageBin == 13) %>%
          `FDR` = padj) 
 
 write.xlsx2(as.data.frame(DEG13), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS7',
             append=TRUE)
@@ -425,7 +425,7 @@ DEG14 <- fittedBias %>% filter(padj<0.1 & ageBin == 14) %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG14), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS8',
             append=TRUE)
@@ -445,7 +445,7 @@ DEG15_16 <- fittedBias %>% filter(padj<0.1 & ageBin == '15-16') %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG15_16), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS9',
             append=TRUE)
@@ -465,7 +465,7 @@ DEG17_19 <- fittedBias %>% filter(padj<0.1 & ageBin == '17-19') %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG17_19), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS10',
             append=TRUE)
@@ -473,16 +473,16 @@ write.xlsx2(as.data.frame(DEG17_19),
 
 Supplementary Tables 11 & 12
 ```{r}
-GO_M_14 <- read_tsv('../Data/DAVID_M14.txt')
+GO_M_14 <- read_tsv('Data/DAVID_M14.txt')
 write.xlsx2(as.data.frame(GO_M_14), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS11',
             append=TRUE)
 
-GO_F_14 <- read_tsv('../Data/DAVID_F14.txt')
+GO_F_14 <- read_tsv('Data/DAVID_F14.txt')
 write.xlsx2(as.data.frame(GO_F_14), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS12',
             append=TRUE)
@@ -491,11 +491,11 @@ write.xlsx2(as.data.frame(GO_F_14),
 
 Supplementary Table 13
 ```{r}
-SampleInfo <- read_tsv("../Data/SampleInfo.txt") %>%
+SampleInfo <- read_tsv("Data/SampleInfo.txt") %>%
   mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
   dplyr::select(-TotalFragments)
 write.xlsx2(as.data.frame(SampleInfo), 
-            file="../Results/SupplemtalTables.xlsx", 
+            file="Tables/SupplemtalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS13',
             append=TRUE)
