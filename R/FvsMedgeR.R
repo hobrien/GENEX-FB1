@@ -10,7 +10,7 @@ setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
 library(devtools)
-load_all(pkg = "SARTools")
+load_all(pkg = "R/SARTools")
 library(tidyverse)
 
 option_list <- list(
