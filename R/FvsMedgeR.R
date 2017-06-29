@@ -5,6 +5,7 @@
 ### designed to be executed with a modified version of SARTools 1.3.0 
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
+setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
@@ -67,11 +68,11 @@ projectName <- paste0("MvsF_",
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
 
-workDir <- paste("../Results", projectName, sep='/')      # working directory for the R session
+workDir <- paste("Results", projectName, sep='/')      # working directory for the R session
 
-rawDir <- "../Counts"                                      # path to the directory containing raw counts files
+rawDir <- "Counts"                                      # path to the directory containing raw counts files
 
-targetFile <- "../Shiny/GENEX-FB1/Data/target.txt"
+targetFile <- "Data/SampleInfo.txt"
 
 featuresToRemove <- c("alignment_not_unique",        # names of the features to be removed
                       "ambiguous", "no_feature",     # (specific HTSeq-count information and rRNA for example)
@@ -101,25 +102,29 @@ colors <- c("dodgerblue","firebrick1",               # vector of colors of each 
 ################################################################################
 
 # loading target file
-target <- read_delim("../Shiny/GENEX-FB1/Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(label=as.character(label))
-target <- arrange(target, Sex)
+LibraryInfo <- read_tsv(targetFile, 
+                        col_types = cols(.default = col_character())
+)
+LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) %>%
+  select(Sample, Files, Sex, PCW, RIN, ReadLength = `Read Length`, Sequencer) %>%
+  mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
+  arrange(Sex)
 if (!is.na(RIN_cutoff)) {
-  target <- filter(target, RIN >= RIN_cutoff)
+  LibraryInfo <- filter(LibraryInfo, RIN >= RIN_cutoff)
 }
 if (!is.null(PCW_cutoff)) {
-  target <- filter(target, PCW >= PCW_cutoff[1] & PCW < PCW_cutoff[2])
+  LibraryInfo <- filter(LibraryInfo, PCW >= PCW_cutoff[1] & PCW < PCW_cutoff[2])
 }
-target <- as.data.frame(target)
-target$Sex=factor(target$Sex)
-target$Sequencer=factor(target$Sequencer)
+
+LibraryInfo <- as.data.frame(LibraryInfo)
+LibraryInfo$Sex=factor(LibraryInfo$Sex)
 
 if (!is.null(male)) {
-  MaleSamples <- filter(target, Sex=='Male')
+  MaleSamples <- filter(LibraryInfo, Sex=='Male')
   MaleSamples <- MaleSamples[sample(nrow(MaleSamples), male),]
-  FemaleSamples <- filter(target, Sex=='Female')
+  FemaleSamples <- filter(LibraryInfo, Sex=='Female')
   FemaleSamples <- FemaleSamples[sample(nrow(FemaleSamples), female),]
-  target <- bind_rows(MaleSamples, FemaleSamples)
+  LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
 
 # checking parameters
@@ -131,38 +136,37 @@ checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFil
 
 
 # loading counts
-counts <- loadCountData(target=target, rawDir=rawDir, featuresToRemove=featuresToRemove)
+counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
 
 dir.create(workDir)
 setwd(workDir)
 
 # description plots
-majSequences <- descriptionPlots(counts=counts, group=target[,varInt], col=colors)
+majSequences <- descriptionPlots(counts=counts, group=LibraryInfo[,varInt], col=colors)
 
 # edgeR analysis
-out.edgeR <- run.edgeR(counts=counts, target=target, varInt=varInt, condRef=condRef,
+out.edgeR <- run.edgeR(counts=counts, target=LibraryInfo, varInt=varInt, condRef=condRef,
                        batch=batch, cpmCutoff=cpmCutoff, normalizationMethod=normalizationMethod,
                        pAdjustMethod=pAdjustMethod)
 
 # MDS + clustering
-exploreCounts(object=out.edgeR$dge, group=target[,varInt], gene.selection=gene.selection, col=colors)
+exploreCounts(object=out.edgeR$dge, group=LibraryInfo[,varInt], gene.selection=gene.selection, col=colors)
 
 # summary of the analysis (boxplots, dispersions, export table, nDiffTotal, histograms, MA plot)
-summaryResults <- summarizeResults.edgeR(out.edgeR, group=target[,varInt], counts=counts, alpha=alpha, col=colors)
+summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], counts=counts, alpha=alpha, col=colors)
 
 # save image of the R session
 save.image(file=paste0(projectName, ".RData"))
 
 # generating HTML report
-writeReport.edgeR(target=target, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
+writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
                   majSequences=majSequences, workDir=workDir, projectName=paste0("MvsF_", PCW_cutoff, collapse='_'), author=author,
                   targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
                   condRef=condRef, batch=batch, alpha=alpha, pAdjustMethod=pAdjustMethod, colors=colors,
                   gene.selection=gene.selection, normalizationMethod=normalizationMethod)
 
 
-
-gene_info <- read_tsv("~/BTSync/FetalRNAseq/GENEX-FB1/Data/genes.csv") %>%
+gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
 
