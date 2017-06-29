@@ -19,8 +19,7 @@ counts <- read_delim("./Data/counts.txt", "\t", escape_double = FALSE, trim_ws =
 fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange)
-target <- read_delim("./Data/target.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(label=as.character(label))
+target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
 PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
@@ -30,8 +29,8 @@ PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
     dplyr::select(-SYMBOL, -Id, -Chr) %>%
     gather() %>%
-    separate(key, into=c('norm', 'label'), sep='[.]') %>%
-    dplyr::select(label, value) %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
     left_join(target) %>%
     filter(PCW >= min & PCW <= max)
   mean <- filter(fitted, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)

@@ -52,3 +52,5 @@ fittedBias <- read_delim("Results/MvsF_12_20_PCW_FDR_0.1/tables/BG12_20.txt", "\
 
 right_join(gene_info, fittedBias) %>% 
   write_tsv("Shiny/GENEX-FB1/Data/fitted.txt")
+
+file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
