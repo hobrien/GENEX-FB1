@@ -158,14 +158,6 @@ summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], 
 # save image of the R session
 save.image(file=paste0(projectName, ".RData"))
 
-# generating HTML report
-writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
-                  majSequences=majSequences, workDir=workDir, projectName=paste0("MvsF_", PCW_cutoff, collapse='_'), author=author,
-                  targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
-                  condRef=condRef, batch=batch, alpha=alpha, pAdjustMethod=pAdjustMethod, colors=colors,
-                  gene.selection=gene.selection, normalizationMethod=normalizationMethod)
-
-
 gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
@@ -189,6 +181,12 @@ MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.na
 right_join(gene_info, MalevsFemale.complete) %>% 
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
+# generating HTML report
+writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
+                  majSequences=majSequences, workDir=workDir, projectName=paste0("MvsF_", PCW_cutoff, collapse='_'), author=author,
+                  targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
+                  condRef=condRef, batch=batch, alpha=alpha, pAdjustMethod=pAdjustMethod, colors=colors,
+                  gene.selection=gene.selection, normalizationMethod=normalizationMethod)
 
 
 
