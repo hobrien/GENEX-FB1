@@ -27,7 +27,9 @@ option_list <- list(
   make_option(c("--male"), type="integer", default=NULL, 
               help="number of male samples"),
   make_option(c("--female"), type="integer", default=NULL, 
-              help="number of female samples")
+              help="number of female samples"),
+  make_option(c("-b", "--batch"), type="character", default="ReadLength", 
+              help="factor to be used as batch correction")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -79,9 +81,9 @@ featuresToRemove <- c("alignment_not_unique",        # names of the features to 
                       "not_aligned", "too_low_aQual")# NULL if no feature to remove
 
 if ( pcw ) {
-  batch <- c("Sequencer", "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
+  batch <- c(opt$batch, "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
 } else {
-  batch <- c("Sequencer", "RIN")                # blocking factor: NULL (default) or "batch" for example
+  batch <- c(opt$batch, "RIN")                # blocking factor: NULL (default) or "batch" for example
 }
 
 varInt <- "Sex"                                    # factor of interest
