@@ -4,9 +4,9 @@ To run mapping on all samples:
 ```
 mkdir Mappings
 mkdir FastQC
-for sample in `cut -f2 /c8000xd3/rnaseq-heath/GENEX-FB1/Data/sequences.txt | sort | uniq | grep 12116`
+for sample in `cut -f2 Data/sequences.txt | sort | uniq | grep 12116`
 do
-    bash /c8000xd3/rnaseq-heath/GENEX-FB1/Bash/MappingPipeline.sh $sample
+    bash Bash/MappingPipeline.sh $sample
 done
 ``` 
 
@@ -18,6 +18,10 @@ do
     find Mappings/ -name $BrainBankID*.chr.counts.txt | xargs Rscript R/CombineCounts.R Counts/$BrainBankID.chr.counts.txt
 done
 ```
+
+To Run EdgeR:
+```
+mkdir Results
 
 ```
 mkdir Tables
