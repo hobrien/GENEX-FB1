@@ -3,7 +3,6 @@ library(dplyr)
 library(stringr)
 library(readr)
 
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 folders <- list.dirs("Mappings", recursive=FALSE)
 
 
@@ -38,7 +37,6 @@ RSeQCstats <- mutate(RSeQCstats, V2=as.numeric(V2))
 RSeQCstats <- spread(RSeQCstats, V1, V2)
 ReadNumbers <- RSeQCstats[,c(1,5)]
 RSeQCstats <- RSeQCstats[c(1,5,3,2,4)]
-RSeQCstats <- RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
 write_tsv(RSeQCstats, "Tables/read_numbers.txt")
 
 # read_distribution.py
