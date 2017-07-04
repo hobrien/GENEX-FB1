@@ -31,7 +31,9 @@ option_list <- list(
   make_option(c("-b", "--batch"), type="character", default="ReadLength", 
               help="factor to be used as batch correction"),
   make_option(c("-t", "--tool"), type="character", default="EdgeR", 
-              help="Tool used for analysis (EdgeR, DESeq)")
+              help="Tool used for analysis (EdgeR, DESeq)"),
+  make_option(c("-e", "--exclude"), type="character", default='', 
+              help="Samples to exclude (comma separated list, no spaces)", metavar="excluded")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -62,13 +64,18 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  PCW_cutoff[1]
 )
 
+exclude <- strsplit(opt$exclude, ',')[[1]]
+
 projectName <- paste0("MvsF_", 
                      ageBin,
                      ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
                      ifelse(!is.null(male), 'Subsample_', ''),
                      ifelse(pcw, "PCW_FDR_", "FDR_"),
                      alpha,
-                     ifelse(opt$tool == 'DESeq', '_DESeq', ''))                         # name of the project
+                     ifelse(opt$tool == 'DESeq', '_DESeq', ''),
+                     ifelse(length(exclude > 0),
+                            paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
+                     )                         # name of the project
 
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
@@ -88,6 +95,7 @@ if ( pcw ) {
 } else {
   batch <- c(opt$batch, "RIN")                # blocking factor: NULL (default) or "batch" for example
 }
+
 
 varInt <- "Sex"                                    # factor of interest
 condRef <- "Female"                                      # reference biological condition
@@ -113,13 +121,11 @@ testMethod <- 'Wald'
 typeTrans <- "VST"                                   # transformation for PCA/clustering: "VST" or "rlog"
 locfunc <- "median"                                  # "median" (default) or "shorth" to estimate the size factors
 interact <- c()
-exclude<-NULL
 excludedFeaturesFile<-NULL
 
 ################################################################################
 ###                             running script                               ###
 ################################################################################
-
 # loading target file
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
@@ -135,6 +141,10 @@ if (!is.null(PCW_cutoff)) {
   LibraryInfo <- filter(LibraryInfo, PCW >= PCW_cutoff[1] & PCW < PCW_cutoff[2])
 }
 
+if (length(exclude) > 0) {
+  LibraryInfo <- dplyr::filter(LibraryInfo, !Sample == exclude)
+}
+
 LibraryInfo <- as.data.frame(LibraryInfo)
 LibraryInfo$Sex=factor(LibraryInfo$Sex)
 
@@ -145,8 +155,6 @@ if (!is.null(male)) {
   FemaleSamples <- FemaleSamples[sample(nrow(FemaleSamples), female),]
   LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
-
-
 
 # loading counts
 counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
