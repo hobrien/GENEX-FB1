@@ -23,3 +23,9 @@ Rscript R/FvsMedgeR.r --min 17 --max 20 --exclude 11971
 # Rscript FvsMedgeR.r --min 15 --max 17 -r 5
 # Rscript FvsMedgeR.r --min 17 --max 20 -r 5
 
+Rscript FvsMedgeR.r --min 12 --max 20 -a --tool DESeq
+Rscript R/FvsMedgeR.r --min 12 --max 13 --tool DESeq
+Rscript R/FvsMedgeR.r --min 13 --max 14 --tool DESeq
+Rscript R/FvsMedgeR.r --min 14 --max 15 --tool DESeq
+Rscript R/FvsMedgeR.r --min 15 --max 17 --tool DESeq
+Rscript R/FvsMedgeR.r --min 17 --max 20 --tool DESeq
