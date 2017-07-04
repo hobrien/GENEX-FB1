@@ -90,8 +90,13 @@ grid.arrange(p1, p2, ncol=2)
 - 28 million - 252 million properly mapped pairs (10.7 billion total)
 - 5.3 million - 114 million read pairs included in counts matrix (3.5 billion total)
 
-- only sample with < 10 million read pairs in count matrix (17046) has 78% of reads mapping to rDNA
-- two additional samples with <10% of read pairs in count matrix have ~50 or reads mapping to rDNA
+- Samples with < 10 million read pairs in count matrix:
+    - 17046 has 78% of reads mapping to rDNA
+    - 18655 has relatively low sequencing depth (78 million read pairs) once I exluded the first batch of sequence because I don't know how to combine technical replicates with different batch effects. It also has a lot of ribosomal
+    
+- one additional samples with <10% of read pairs in count matrix has ~50% of reads mapping to rDNA (16428)
+
+- 11971 has 671 million read pairs and >450 million in count matrix
 
 
 ```{r }
