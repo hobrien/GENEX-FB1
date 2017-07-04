@@ -29,7 +29,9 @@ option_list <- list(
   make_option(c("--female"), type="integer", default=NULL, 
               help="number of female samples"),
   make_option(c("-b", "--batch"), type="character", default="ReadLength", 
-              help="factor to be used as batch correction")
+              help="factor to be used as batch correction"),
+  make_option(c("-t", "--tool"), type="character", default="EdgeR", 
+              help="Tool used for analysis (EdgeR, DESeq)")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -65,7 +67,8 @@ projectName <- paste0("MvsF_",
                      ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
                      ifelse(!is.null(male), 'Subsample_', ''),
                      ifelse(pcw, "PCW_FDR_", "FDR_"),
-                     alpha)                         # name of the project
+                     alpha,
+                     ifelse(opt$tool == 'DESeq', '_DESeq', ''))                         # name of the project
 
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
@@ -91,13 +94,27 @@ condRef <- "Female"                                      # reference biological 
 
 pAdjustMethod <- "BH"                                # p-value adjustment method: "BH" (default) or "BY"
 
+colors <- c("dodgerblue","firebrick1",               # vector of colors of each biological condition on the plots
+            "MediumVioletRed","SpringGreen")
+
+
+# EdgeR parameters
 cpmCutoff <- 1                                       # counts-per-million cut-off to filter low counts
 gene.selection <- "pairwise"                         # selection of the features in MDSPlot
 normalizationMethod <- "TMM"                         # normalization method: "TMM" (default), "RLE" (DESeq) or "upperquartile"
 
-colors <- c("dodgerblue","firebrick1",               # vector of colors of each biological condition on the plots
-            "MediumVioletRed","SpringGreen")
-
+# DESeq parameters
+fitType <- "parametric"                              # mean-variance relationship: "parametric" (default) or "local"
+#if numeric, features with maxCooks values above this number are removed 
+cooksCutoff <-  0.75 #FALSE                          # TRUE/FALSE to perform the outliers detection (default is TRUE)
+independentFiltering <- TRUE                         # TRUE/FALSE to perform independent filtering (default is TRUE)
+# p-value adjustment method: "BH" (default) or "BY"
+testMethod <- 'Wald'
+typeTrans <- "VST"                                   # transformation for PCA/clustering: "VST" or "rlog"
+locfunc <- "median"                                  # "median" (default) or "shorth" to estimate the size factors
+interact <- c()
+exclude<-NULL
+excludedFeaturesFile<-NULL
 
 ################################################################################
 ###                             running script                               ###
@@ -129,12 +146,6 @@ if (!is.null(male)) {
   LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
 
-# checking parameters
-checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
-                      rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
-                      condRef=condRef,batch=batch,alpha=alpha,pAdjustMethod=pAdjustMethod,
-                      cpmCutoff=cpmCutoff,gene.selection=gene.selection,
-                      normalizationMethod=normalizationMethod,colors=colors)
 
 
 # loading counts
@@ -147,15 +158,59 @@ setwd(workDir)
 majSequences <- descriptionPlots(counts=counts, group=LibraryInfo[,varInt], col=colors)
 
 # edgeR analysis
-out.edgeR <- run.edgeR(counts=counts, target=LibraryInfo, varInt=varInt, condRef=condRef,
+if ( opt$tool == 'EdgeR' ) {
+    # checking parameters
+    checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
+                      rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
+                      condRef=condRef,batch=batch,alpha=alpha,pAdjustMethod=pAdjustMethod,
+                      cpmCutoff=cpmCutoff,gene.selection=gene.selection,
+                      normalizationMethod=normalizationMethod,colors=colors)
+
+    out.edgeR <- run.edgeR(counts=counts, target=LibraryInfo, varInt=varInt, condRef=condRef,
                        batch=batch, cpmCutoff=cpmCutoff, normalizationMethod=normalizationMethod,
                        pAdjustMethod=pAdjustMethod)
 
-# MDS + clustering
-exploreCounts(object=out.edgeR$dge, group=LibraryInfo[,varInt], gene.selection=gene.selection, col=colors)
+    # MDS + clustering
+    exploreCounts(object=out.edgeR$dge, group=LibraryInfo[,varInt], gene.selection=gene.selection, col=colors)
 
-# summary of the analysis (boxplots, dispersions, export table, nDiffTotal, histograms, MA plot)
-summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], counts=counts, alpha=alpha, col=colors)
+    # summary of the analysis (boxplots, dispersions, export table, nDiffTotal, histograms, MA plot)
+    summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], counts=counts, alpha=alpha, col=colors)
+} else if ( opt$tool == 'DESeq' ) {
+# DEseq analysis
+  checkParameters.DESeq2(projectName=projectName,author=author,targetFile=targetFile,
+                                              rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
+                                              condRef=condRef,batch=batch,fitType=fitType,cooksCutoff=cooksCutoff,
+                                              independentFiltering=independentFiltering,alpha=alpha,pAdjustMethod=pAdjustMethod,
+                                              typeTrans=typeTrans,locfunc=locfunc,colors=colors)
+
+  if (testMethod=='Wald' ) {
+    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
+                           locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
+                           cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
+    mcols(out.DESeq2$dds)$maxCooks <- apply(assays(out.DESeq2$dds)[["cooks"]], 1, max)
+    if (is.numeric(cooksCutoff)) {
+      out.DESeq2$results$Male_vs_Female$pvalue[mcols(out.DESeq2$dds)$maxCooks > cooksCutoff] <- NA
+      out.DESeq2$results$Male_vs_Female$padj <- p.adjust(out.DESeq2$results$Male_vs_Female$pvalue, method="BH")
+    }  
+  } else if (testMethod=='LRT' ) {
+    out.DESeq2 <- run.DESeq2.LRT(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
+                               locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
+                               cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
+  } else {
+    stop("testMethod not recognised")
+  }
+  # PCA + clustering
+  exploreCounts(object=out.DESeq2$dds, group=LibraryInfo[,varInt], typeTrans=typeTrans, col=colors)
+
+  # summary of the analysis (boxplots, dispersions, diag size factors, export table, nDiffTotal, histograms, MA plot)
+  summaryResults <- summarizeResults.DESeq2(out.DESeq2, group=LibraryInfo[,varInt], col=colors,
+                                          independentFiltering=independentFiltering,
+                                          cooksCutoff=cooksCutoff, alpha=alpha)
+} else {
+  stop("Tool should be one of 'EdgeR', 'DESeq'")
+}
+
+################################################################################
 
 # save image of the R session
 save.image(file=paste0(projectName, ".RData"))
@@ -184,11 +239,21 @@ right_join(gene_info, MalevsFemale.complete) %>%
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
 # generating HTML report
+if ( opt$tool == 'EdgeR' ) {
 writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
                   majSequences=majSequences, workDir=workDir, projectName=paste0("MvsF_", PCW_cutoff, collapse='_'), author=author,
                   targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
                   condRef=condRef, batch=batch, alpha=alpha, pAdjustMethod=pAdjustMethod, colors=colors,
                   gene.selection=gene.selection, normalizationMethod=normalizationMethod)
 
+} else if ( opt$tool == 'DESeq' ) {
+  
+  writeReport.DESeq2(target=LibraryInfo, counts=counts, out.DESeq2=out.DESeq2, summaryResults=summaryResults,
+                   majSequences=majSequences, workDir=workDir, projectName=projectName, author=author,
+                   targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
+                   condRef=condRef, batch=batch, fitType=fitType, cooksCutoff=cooksCutoff,
+                   independentFiltering=independentFiltering, alpha=alpha, pAdjustMethod=pAdjustMethod,
+                   typeTrans=typeTrans, locfunc=locfunc, colors=colors)
+}
 
 
