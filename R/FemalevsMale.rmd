@@ -121,7 +121,10 @@ combined <- left_join(SeqInfo, lengths, by='read_file') %>%
 
 mapping_stats <- read_tsv("../Tables/read_numbers.txt",
                           col_types = cols(sample = 'c'),
-                          trim_ws = TRUE)
+                          trim_ws = TRUE) %>%
+  mutate(sample = str_extract(sample, "^[^-]+")) %>% 
+  group_by(sample) %>% 
+  summarise_each("sum")
 
 
 total_reads <- combined %>%
