@@ -33,7 +33,10 @@ option_list <- list(
   make_option(c("-t", "--tool"), type="character", default="EdgeR", 
               help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
   make_option(c("-e", "--exclude"), type="character", default='', 
-              help="Samples to exclude (comma separated list, no spaces)", metavar="excluded")
+              help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
+  make_option(c("-i", "--interaction"), action='store_true', type="logical", default=FALSE, 
+              help="Include interaction between age and sex", metavar="interact")
+  
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -66,12 +69,15 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
 
 exclude <- strsplit(opt$exclude, ',')[[1]]
 
-projectName <- paste0("MvsF_", 
+projectName <- paste0(ifelse(opt$tool == 'DESeqLRT', 
+                             ifelse(opt$interact, "PCWxSex_", "PCW_Sex_"),
+                             ifelse(pcw, "Sex_PCW_", "Sex_")
+                             ),
                      ageBin,
                      ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
                      ifelse(!is.null(male), 'Subsample_', ''),
-                     ifelse(pcw, "PCW_FDR_", "FDR_"),
                      alpha,
+                     '_',
                      opt$tool,
                      ifelse(length(exclude > 0),
                             paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
@@ -91,10 +97,18 @@ featuresToRemove <- c("alignment_not_unique",        # names of the features to 
                       "not_aligned", "too_low_aQual")# NULL if no feature to remove
 
 if (opt$tool == 'DESeqLRT') {
-  batch <- c(opt$batch, "RIN", "Sex")                # blocking factor: NULL (default) or "batch" for example
-  varInt <- "PCW"                                    # factor of interest
+  varInt <- "PCW"  # factor of interest
+  if (opt$interact ) {
+    interact <- c("Sex")
+    batch <- c(opt$batch, "RIN") # blocking factor: NULL (default) or "batch" for example
+  } else{
+    interact <- c()
+    batch <- c(opt$batch, "RIN", "Sex") # blocking factor: NULL (default) or "batch" for example
+  }  
 } else{ 
-  varInt <- "Sex"                                    # factor of interest
+  varInt <- "Sex"
+  interact <- c()
+  # factor of interest
   if ( pcw ) {
     batch <- c(opt$batch, "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
   } else {
@@ -128,7 +142,6 @@ if (opt$tool == 'DESeqLRT') {
 }
 typeTrans <- "VST"                                   # transformation for PCA/clustering: "VST" or "rlog"
 locfunc <- "median"                                  # "median" (default) or "shorth" to estimate the size factors
-interact <- c()
 excludedFeaturesFile<-NULL
 
 ################################################################################
@@ -191,7 +204,7 @@ if ( opt$tool == 'EdgeR' ) {
 
     # summary of the analysis (boxplots, dispersions, export table, nDiffTotal, histograms, MA plot)
     summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], counts=counts, alpha=alpha, col=colors)
-} else if ( opt$tool == 'DESeq' ) {
+} else if ( opt$tool == 'DESeq' | opt$tool == 'DESeqLRT') {
 # DEseq analysis
   checkParameters.DESeq2(projectName=projectName,author=author,targetFile=targetFile,
                                               rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
