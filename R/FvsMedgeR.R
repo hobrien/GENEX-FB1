@@ -31,7 +31,7 @@ option_list <- list(
   make_option(c("-b", "--batch"), type="character", default="ReadLength", 
               help="factor to be used as batch correction"),
   make_option(c("-t", "--tool"), type="character", default="EdgeR", 
-              help="Tool used for analysis (EdgeR, DESeq)"),
+              help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
   make_option(c("-e", "--exclude"), type="character", default='', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded")
 )
@@ -72,7 +72,7 @@ projectName <- paste0("MvsF_",
                      ifelse(!is.null(male), 'Subsample_', ''),
                      ifelse(pcw, "PCW_FDR_", "FDR_"),
                      alpha,
-                     ifelse(opt$tool == 'DESeq', '_DESeq', ''),
+                     opt$tool,
                      ifelse(length(exclude > 0),
                             paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
                      )                         # name of the project
@@ -90,14 +90,18 @@ featuresToRemove <- c("alignment_not_unique",        # names of the features to 
                       "ambiguous", "no_feature",     # (specific HTSeq-count information and rRNA for example)
                       "not_aligned", "too_low_aQual")# NULL if no feature to remove
 
-if ( pcw ) {
-  batch <- c(opt$batch, "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
-} else {
-  batch <- c(opt$batch, "RIN")                # blocking factor: NULL (default) or "batch" for example
+if (opt$tool == 'DESeqLRT') {
+  batch <- c(opt$batch, "RIN", "Sex")                # blocking factor: NULL (default) or "batch" for example
+  varInt <- "PCW"                                    # factor of interest
+} else{ 
+  varInt <- "Sex"                                    # factor of interest
+  if ( pcw ) {
+    batch <- c(opt$batch, "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
+  } else {
+    batch <- c(opt$batch, "RIN")                # blocking factor: NULL (default) or "batch" for example
+  }
 }
 
-
-varInt <- "Sex"                                    # factor of interest
 condRef <- "Female"                                      # reference biological condition
 
 pAdjustMethod <- "BH"                                # p-value adjustment method: "BH" (default) or "BY"
@@ -117,7 +121,11 @@ fitType <- "parametric"                              # mean-variance relationshi
 cooksCutoff <-  0.75 #FALSE                          # TRUE/FALSE to perform the outliers detection (default is TRUE)
 independentFiltering <- TRUE                         # TRUE/FALSE to perform independent filtering (default is TRUE)
 # p-value adjustment method: "BH" (default) or "BY"
-testMethod <- 'Wald'
+if (opt$tool == 'DESeqLRT') {
+  testMethod <- 'LRT'
+} else{
+  testMethod <- 'Wald'
+}
 typeTrans <- "VST"                                   # transformation for PCA/clustering: "VST" or "rlog"
 locfunc <- "median"                                  # "median" (default) or "shorth" to estimate the size factors
 interact <- c()
@@ -227,24 +235,45 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
 
-MalevsFemale.up <- read.delim("tables/MalevsFemale.up.txt", check.names=FALSE)  %>% 
-  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-right_join(gene_info, MalevsFemale.up) %>% 
-  write_tsv(paste0("tables/MaleUp", ageBin, ".txt"))
-
-MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALSE)  %>% 
-  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-right_join(gene_info, MalevsFemale.down) %>% 
+if (opt$tool == 'DESeqLRT') {
+  Upregulated <- read.delim("tables/dropPCW.up.txt", check.names=FALSE)  %>% 
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, Upregulated) %>% 
+    write_tsv(paste0("tables/Upregulated", ".txt"))
+  
+  Downregulated <- read.delim("tables/dropPCW.down.txt", check.names=FALSE)  %>% 
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, Downregulated) %>% 
+    write_tsv(paste0("tables/Downregulated", ".txt"))
+  
+  Complete <- read.delim("tables/dropPCW.complete.txt", check.names=FALSE)  %>%
+    filter(! is.na(padj)) %>%
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, Complete) %>% 
+    write_tsv(paste0("tables/BG", ".txt"))
+} else {
+  MalevsFemale.up <- read.delim("tables/MalevsFemale.up.txt", check.names=FALSE)  %>% 
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, MalevsFemale.up) %>% 
+    write_tsv(paste0("tables/MaleUp", ageBin, ".txt"))
+  
+  MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALSE)  %>% 
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, MalevsFemale.down) %>% 
     write_tsv(paste0("tables/FemaleUp", ageBin, ".txt"))
-
-MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
-  filter(! is.na(padj)) %>%
-  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-  dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-right_join(gene_info, MalevsFemale.complete) %>% 
-  write_tsv(paste0("tables/BG", ageBin, ".txt"))
+  
+  MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
+    filter(! is.na(padj)) %>%
+    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
+  right_join(gene_info, MalevsFemale.complete) %>% 
+    write_tsv(paste0("tables/BG", ageBin, ".txt"))
+}
 
 # generating HTML report
 if ( opt$tool == 'EdgeR' ) {
