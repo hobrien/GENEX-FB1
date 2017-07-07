@@ -9,11 +9,10 @@ setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
-library(devtools)
-load_all(pkg = "R/SARTools")
-library(tidyverse)
 
 option_list <- list(
+  make_option(c("-v", "--varInt"), type="character", default="Sex", 
+              help="Variable of interest (either Sex or PCW)"),
   make_option(c("-m", "--min"), type="integer", default=NULL, 
               help="minimum age (PCW)", metavar="minimum age"),
   make_option(c("-x", "--max"), type="integer", default=NULL, 
@@ -22,20 +21,20 @@ option_list <- list(
               help="minimum RIN", metavar="minimum RIN"),
   make_option(c("-p", "--pvalue"), type="numeric", default=0.1, 
               help="corrected pvalue cutoff", metavar="pvalue"),
-  make_option(c("-a", "--age"), action='store_true', type="logical", default=FALSE, 
-              help="Include age as a cofactor", metavar="age"),
+  make_option(c("-c", "--cofactor"), type="character", default="", 
+              help="Cofactors (either Sex or PCW)"),
   make_option(c("--male"), type="integer", default=NULL, 
               help="number of male samples"),
   make_option(c("--female"), type="integer", default=NULL, 
               help="number of female samples"),
-  make_option(c("-b", "--batch"), type="character", default="ReadLength", 
-              help="factor to be used as batch correction"),
+  make_option(c("-b", "--batch"), type="character", default="RIN,ReadLength", 
+              help="factors to be used as batch correction"),
   make_option(c("-t", "--tool"), type="character", default="EdgeR", 
               help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
   make_option(c("-e", "--exclude"), type="character", default='', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
-  make_option(c("-i", "--interaction"), action='store_true', type="logical", default=FALSE, 
-              help="Include interaction between age and sex", metavar="interact")
+  make_option(c("-i", "--interaction"), type="character", default="", 
+              help="Cofactors to interact with varInt", metavar = 'interact')
   
 )
 
@@ -51,14 +50,24 @@ if ( opt$max-opt$min < 1 ) {
   stop("Min age must be less than max", call.=FALSE)
 }
 
+if (! opt$tool %in% c('EdgeR', 'DESeq', 'DESeqLRT')){
+  print_help(opt_parser)
+  stop("Tool must be one of EdgeR, DESeq or DESeqLRT", call.=FALSE)
+}
+
+if (! opt$interact == "" & ! opt$tool == 'DESeqLRT') {
+  print_help(opt_parser)
+  stop("Interactions can only be tested with LRTs", call.=FALSE)
+}
+
 PCW_cutoff <- c(opt$min, opt$max)
 RIN_cutoff <- opt$rin
 alpha <- opt$pvalue 
 BrainBank <- opt$brainbank
-pcw <- opt$age
 exclude_sex <- opt$sex_chromosomes
 male <- opt$male
 female <- opt$female
+varInt <- opt$varInt  # factor of interest
 
 ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1, 
                  paste(PCW_cutoff, 
@@ -66,22 +75,23 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  ),
                  PCW_cutoff[1]
 )
-
+interact <- strsplit(opt$interact, ',')[[1]]
 exclude <- strsplit(opt$exclude, ',')[[1]]
+batch <- strsplit(opt$batch, ',')[[1]]
+cofactor <- strsplit(opt$cofactor, ',')[[1]]
 
-projectName <- paste0(ifelse(opt$tool == 'DESeqLRT', 
-                             ifelse(opt$interact, "PCWxSex_", "PCW_Sex_"),
-                             ifelse(pcw, "Sex_PCW_", "Sex_")
-                             ),
-                     ageBin,
-                     ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
-                     ifelse(!is.null(male), 'Subsample_', ''),
-                     alpha,
-                     '_',
-                     opt$tool,
-                     ifelse(length(exclude > 0),
-                            paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
-                     )                         # name of the project
+projectName <- paste0(varInt, 
+       ifelse(length(cofactor)>0, paste0('_', cofactor, collapse = ''), ''),
+       ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
+       '_', ageBin,
+       ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
+       ifelse(!is.null(male), 'Subsample_', ''),
+       'FDR_', alpha,
+       '_',
+       opt$tool,
+       ifelse(length(exclude > 0),
+              paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
+)                         # name of the project
 
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
@@ -96,25 +106,6 @@ featuresToRemove <- c("alignment_not_unique",        # names of the features to 
                       "ambiguous", "no_feature",     # (specific HTSeq-count information and rRNA for example)
                       "not_aligned", "too_low_aQual")# NULL if no feature to remove
 
-if (opt$tool == 'DESeqLRT') {
-  varInt <- "PCW"  # factor of interest
-  if (opt$interact ) {
-    interact <- c("Sex")
-    batch <- c(opt$batch, "RIN") # blocking factor: NULL (default) or "batch" for example
-  } else{
-    interact <- c()
-    batch <- c(opt$batch, "RIN", "Sex") # blocking factor: NULL (default) or "batch" for example
-  }  
-} else{ 
-  varInt <- "Sex"
-  interact <- c()
-  # factor of interest
-  if ( pcw ) {
-    batch <- c(opt$batch, "RIN", "PCW")                # blocking factor: NULL (default) or "batch" for example
-  } else {
-    batch <- c(opt$batch, "RIN")                # blocking factor: NULL (default) or "batch" for example
-  }
-}
 
 condRef <- "Female"                                      # reference biological condition
 
@@ -147,6 +138,11 @@ excludedFeaturesFile<-NULL
 ################################################################################
 ###                             running script                               ###
 ################################################################################
+
+library(devtools)
+load_all(pkg = "R/SARTools")
+library(tidyverse)
+
 # loading target file
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
@@ -249,44 +245,31 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
 
 if (opt$tool == 'DESeqLRT') {
-  Upregulated <- read.delim("tables/dropPCW.up.txt", check.names=FALSE)  %>% 
+  upfile=paste0("tables/Upregulated", ageBin, ".txt")
+  downfile=paste0("tables/Downregulated", ageBin, ".txt")
+} else {
+  upfile=paste0("tables/MaleUp", ageBin, ".txt")
+  downfile=paste0("tables/FemaleUp", ageBin, ".txt")
+}
+
+Upregulated <- read.delim(paste('tables', list.files('tables', pattern = ".up.txt$") , sep= '/'), check.names=FALSE)  %>% 
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
-  right_join(gene_info, Upregulated) %>% 
-    write_tsv(paste0("tables/Upregulated", ".txt"))
+right_join(gene_info, Upregulated) %>% 
+    write_tsv(upfile)
   
-  Downregulated <- read.delim("tables/dropPCW.down.txt", check.names=FALSE)  %>% 
+Downregulated <- read.delim(paste('tables', list.files('tables', pattern = ".down.txt$") , sep= '/'), check.names=FALSE)  %>% 
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
-  right_join(gene_info, Downregulated) %>% 
-    write_tsv(paste0("tables/Downregulated", ".txt"))
+right_join(gene_info, Downregulated) %>% 
+    write_tsv(downfile)
   
-  Complete <- read.delim("tables/dropPCW.complete.txt", check.names=FALSE)  %>%
+Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE)  %>% 
     filter(! is.na(padj)) %>%
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
   right_join(gene_info, Complete) %>% 
-    write_tsv(paste0("tables/BG", ".txt"))
-} else {
-  MalevsFemale.up <- read.delim("tables/MalevsFemale.up.txt", check.names=FALSE)  %>% 
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-  right_join(gene_info, MalevsFemale.up) %>% 
-    write_tsv(paste0("tables/MaleUp", ageBin, ".txt"))
-  
-  MalevsFemale.down <- read.delim("tables/MalevsFemale.down.txt", check.names=FALSE)  %>% 
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-  right_join(gene_info, MalevsFemale.down) %>% 
-    write_tsv(paste0("tables/FemaleUp", ageBin, ".txt"))
-  
-  MalevsFemale.complete <- read.delim("tables/MalevsFemale.complete.txt", check.names=FALSE)  %>%
-    filter(! is.na(padj)) %>%
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, Female, Male, FC, log2FoldChange, pvalue, padj)
-  right_join(gene_info, MalevsFemale.complete) %>% 
     write_tsv(paste0("tables/BG", ageBin, ".txt"))
-}
 
 # generating HTML report
 if ( opt$tool == 'EdgeR' ) {
@@ -296,7 +279,7 @@ writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summar
                   condRef=condRef, batch=batch, alpha=alpha, pAdjustMethod=pAdjustMethod, colors=colors,
                   gene.selection=gene.selection, normalizationMethod=normalizationMethod)
 
-} else if ( opt$tool == 'DESeq' ) {
+} else {
   
   writeReport.DESeq2(target=LibraryInfo, counts=counts, out.DESeq2=out.DESeq2, summaryResults=summaryResults,
                    majSequences=majSequences, workDir=workDir, projectName=projectName, author=author,
