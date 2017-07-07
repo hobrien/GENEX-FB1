@@ -17,13 +17,8 @@ library(DT)
 
 # setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Shiny/GENEX-FB1")
 
-counts <- list('12-19' = read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE),
-               '12' = read_delim("./Data/counts12.txt", "\t", escape_double = FALSE, trim_ws = TRUE),
-               '13' = read_delim("./Data/counts13.txt", "\t", escape_double = FALSE, trim_ws = TRUE),
-               '14' = read_delim("./Data/counts14.txt", "\t", escape_double = FALSE, trim_ws = TRUE),
-               '15-16' = read_delim("./Data/counts15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE),
-               '17-19' = read_delim("./Data/counts17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
-)
+counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
 fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange)
@@ -31,12 +26,16 @@ target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols
 
 PlotExpression<-function(geneID, counts, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-  data <- counts[[ages]] %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+  ageSplit <- strsplit(ages, '-')[[1]]
+  min <- ageSplit[1]
+  max <- ageSplit[length(ageSplit)]
+  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
     dplyr::select(-SYMBOL, -Id, -Chr) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
-    left_join(target)
+    left_join(target) %>%
+    filter(PCW >= min & PCW <= max)
   title<-paste0(geneID, ': p=', ', q=')
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
@@ -51,12 +50,16 @@ PlotExpression<-function(geneID, counts, target, ages) {
 
 PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-  data <- counts[[ages]] %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+  ageSplit <- strsplit(ages, '-')[[1]]
+  min <- ageSplit[1]
+  max <- ageSplit[length(ageSplit)]
+  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
     dplyr::select(-SYMBOL, -Id, -Chr) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
-    left_join(target)
+    left_join(target) %>%
+    filter(PCW >= min & PCW <= max)
   mean <- filter(fitted, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
   fc <- mean$log2FoldDiff[1] %>% format(digits=2)
   pval <- mean$pvalue[1]
