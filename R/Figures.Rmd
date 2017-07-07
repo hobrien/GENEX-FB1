@@ -6,7 +6,11 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE,
+                      root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 library(tidyverse)
