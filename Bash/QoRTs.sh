@@ -3,10 +3,15 @@
 #$ -cwd
 #$ -j y
 #$ -S /bin/bash
+#$ -l h_vmem=12G
 #
 
 INFILE=$1
-OUTPUTDIR=$2
+BASENAME=${INFILE##*/} 
+OUTPUTDIR=JunctionSeq/${BASENAME%%.*}
+_JAVA_OPTIONS='-Xms256M -Xmx8G -XX:ParallelGCThreads=1'
+
+mkdir $OUTPUTDIR
 java -jar ~/src/QoRTs.jar QC \
 --stranded \
 --minMAPQ 50 \
