@@ -244,30 +244,32 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
 
-if (opt$tool == 'DESeqLRT') {
-  upfile=paste0("tables/Upregulated", ageBin, ".txt")
-  downfile=paste0("tables/Downregulated", ageBin, ".txt")
-} else {
+if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
   downfile=paste0("tables/FemaleUp", ageBin, ".txt")
+  col_names <- c('Id', 'baseMean', 'Male', 'Female', 'FC', 'log2FoldChange', 'pvalue', 'padj')
+} else {
+  upfile=paste0("tables/Upregulated", ageBin, ".txt")
+  downfile=paste0("tables/Downregulated", ageBin, ".txt")
+  col_names <- c('Id', 'baseMean', 'FC', 'log2FoldChange', 'pvalue', 'padj')
 }
 
 Upregulated <- read.delim(paste('tables', list.files('tables', pattern = ".up.txt$") , sep= '/'), check.names=FALSE)  %>% 
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+    dplyr::select(one_of(col_names))
 right_join(gene_info, Upregulated) %>% 
     write_tsv(upfile)
   
 Downregulated <- read.delim(paste('tables', list.files('tables', pattern = ".down.txt$") , sep= '/'), check.names=FALSE)  %>% 
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+    dplyr::select(one_of(col_names))
 right_join(gene_info, Downregulated) %>% 
     write_tsv(downfile)
   
 Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE)  %>% 
     filter(! is.na(padj)) %>%
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(Id, baseMean, FC, log2FoldChange, pvalue, padj)
+    dplyr::select(one_of(col_names))
   right_join(gene_info, Complete) %>% 
     write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
