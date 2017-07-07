@@ -10,6 +10,12 @@ do
 done
 ``` 
 
+To analyse QC:
+```
+mkdir Tables
+Rscript R/SummariseBamQC.R
+```
+
 To merge counts for samples sequenced on multiple lanes:
 ```
 mkdir Counts
@@ -22,8 +28,14 @@ done
 To Run EdgeR:
 ```
 mkdir Results
-
+bash Bash/RunEdgeR.sh
 ```
-mkdir Tables
-Rscript R/SummariseBamQC.R
+
+To Run JunctionSeq:
+```
+mkdir JunctionSeq
+find Mappings/ -name *.chr.bam | grep -v 1117 | sort | xargs -n 1 qsub Bash/QoRTs.sh
+echo -e 'unique.ID\tsample.ID' > JunctionSeq/decoder.byUID.txt
+cut -f 2 Data/sequences.txt | grep '-' | sort | uniq | perl -pe 's/([^-]+)(.*)/$1$2\t$1/' >> JunctionSeq/decoder.byUID.txt 
+qsub Bash/MergeQoRTs.sh JunctionSeq
 ```
