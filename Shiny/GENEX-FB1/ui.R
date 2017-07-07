@@ -13,22 +13,23 @@ library(shiny)
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
 
 navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
-            tabPanel("Plot",
-                     sidebarLayout(
-                       sidebarPanel(
-                         textInput("geneID", "Gene symbol or Ensembl ID", value='GRIN2A'),
-                         radioButtons("ages", "Post-Conception Weeks", c('12', '13', '14', '15-16', '17-19', '12-19'), selected = '12-19', inline = FALSE,
-                                      width = NULL),
-                         plotOutput("sampleSizeHist", height=200)
-                       ),
-                       
-                       # Show a plot of the generated distribution
-                       mainPanel(
-                         plotOutput("distPlot")
-                       )
-                     )
-            ),
-            tabPanel("Table",
+           tabPanel("Sex Diffs",
+                    sidebarLayout(
+                      sidebarPanel(
+                        textInput("geneID", "Gene symbol or Ensembl ID", value='GRIN2A'),
+                        radioButtons("ages", "Post-Conception Weeks", c('12', '13', '14', '15-16', '17-19', '12-19'), selected = '12-19', inline = FALSE,
+                                     width = NULL),
+                        plotOutput("sampleSizeHist", height=200)
+                      ),
+                      
+                      # Show a plot of the generated distribution
+                      mainPanel(
+                        plotOutput("distPlot"),
+                        plotOutput("timeCourse")
+                      )
+                    )
+           ),
+           tabPanel("Table",
                      sidebarLayout(
                        sidebarPanel(
                          radioButtons("p_type", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,

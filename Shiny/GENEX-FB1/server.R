@@ -29,10 +29,30 @@ fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws =
   dplyr::rename(log2FoldDiff = log2FoldChange)
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
+PlotExpression<-function(geneID, counts, target, ages) {
+  geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+  data <- counts[[ages]] %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+    dplyr::select(-SYMBOL, -Id, -Chr) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(target)
+  title<-paste0(geneID, ': p=', ', q=')
+  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
+    geom_jitter(height = 0, width=.1, alpha=.75) + 
+    geom_smooth() +
+    ylab("normalised counts") +
+    xlab('') +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(title) 
+  plot
+}
+
 PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
   data <- counts[[ages]] %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
+    dplyr::select(-SYMBOL, -Id, -Chr) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
@@ -83,6 +103,9 @@ shinyServer(function(input, output) {
    
   output$distPlot <- renderPlot({
     PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
+  })
+  output$timeCourse <- renderPlot({
+    PlotExpression(toupper(input$geneID), counts, target, input$ages)
   })
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)
