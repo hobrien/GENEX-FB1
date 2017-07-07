@@ -116,7 +116,7 @@ RSeQCsat <- RSeQCsat %>% mutate(BrainBankID=str_extract(sample, "^[^-]+")) %>%
   full_join(ReadNumbers) %>%
   dplyr::select(-BrainBankID)
 
-ggplot(RSeQCsat, aes(y=junctions, x=ReadNumbers*percent_reads/100, group=sample, colour=`Read Length`)) +
+ggplot(RSeQCsat, aes(y=junctions, x=Unique*percent_reads/100, group=sample, colour=`Read Length`)) +
   geom_point() +
   #xlim(c(0,500)) +
   #scale_y_log10() +

@@ -3,19 +3,20 @@ title: "Female vs Male"
 output: html_notebook
 ---
 
-```{r global_options, include=FALSE}
-knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
-                      echo=FALSE, warning=FALSE, message=FALSE)
-
+```{r setup, include=FALSE}
+knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE,
+                      root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 ```
 
-
-```{r setup, include=FALSE}
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+```{r, incluse=FALSE}
 library(tidyverse)
 library(gridExtra)
 library(clusterProfiler)
 library(GGally)
+library(stringr)
 source("Shiny/GENEX-FB1/FormatGGplot.R")
 
 LibraryInfo <- read_tsv("Data/SampleInfo.txt", 
@@ -47,6 +48,23 @@ CPM1 <- Fold_changes %>%
   mutate(week=ifelse(ageBin=='15-16', 15.5,
                      ifelse(ageBin=='17-19', 18, as.numeric(ageBin))
         ))
+
+
+PlotFC_by_ChrType <- function(genes, set_name) {
+  genes <- filter(genes, ageBin != '12-19') %>%
+    mutate(week = ifelse(ageBin=='15-16', 15.5, ifelse(ageBin == '17-19', 18, as.numeric(ageBin))))
+  plot <- ggplot(genes, aes(x=week, y=log2FoldChange, group=Id)) +
+    geom_line(alpha=1, aes(colour=ChrType)) +
+    geom_point(colour='black', size=1, alpha=.25, data=filter(genes, padj<.1)) +
+    scale_x_continuous(breaks=c(12,13,14,15.5,18), labels=c('12', '13', '14', '15-16', '17-19')) +
+    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) + 
+    main_theme() +
+    ylab("<--- Female-biased        Male-biased --->") +
+    xlab("Post Conception Week") +
+    theme(axis.title.y=element_text(size=9)) +
+    ggtitle(paste("Log fold differences in", set_name))
+  plot        
+}
 
 ```
 
@@ -90,8 +108,13 @@ grid.arrange(p1, p2, ncol=2)
 - 28 million - 252 million properly mapped pairs (10.7 billion total)
 - 5.3 million - 114 million read pairs included in counts matrix (3.5 billion total)
 
-- only sample with < 10 million read pairs in count matrix (17046) has 78% of reads mapping to rDNA
-- two additional samples with <10% of read pairs in count matrix have ~50 or reads mapping to rDNA
+- Samples with < 10 million read pairs in count matrix:
+    - 17046 (12 PCW) has 78% of reads mapping to rDNA
+    - 18655 (13 PCW) has relatively low sequencing depth (78 million read pairs) once I exluded the first batch of sequence because I don't know how to combine technical replicates with different batch effects. It also has a lot of ribosomal
+    
+- one additional samples with <10% of read pairs in count matrix has ~50% of reads mapping to rDNA (16428)
+
+- 11971 (17 PCW) has 671 million read pairs and >450 million in count matrix
 
 
 ```{r }
@@ -103,12 +126,12 @@ Counts <- count_matrix %>%
   group_by(Sample) %>%
   dplyr::summarise(TotalCount=sum(Count))
 
-lengths <- read_delim("../FastQC/seq_lengths.txt", 
+lengths <- read_delim("FastQC/seq_lengths.txt", 
                       delim='\t', 
                       col_names=c('read_file', 'num_reads'), 
                       col_types=cols(read_file='c', num_reads='i')
                       )
-SeqInfo <- read_delim("../Data/sequences.txt", 
+SeqInfo <- read_delim("Data/sequences.txt", 
                      delim='\t',
                      col_names=c('read_file', 'read_group', 'centre', 'folder', 'trimmed'),
                      col_types=cols(read_file='c', read_group='c', centre='c', folder='c', trimmed='c')
@@ -119,9 +142,12 @@ combined <- left_join(SeqInfo, lengths, by='read_file') %>%
   separate(read_group, c('Sample', 'run'), fill='right', remove=FALSE) %>%
   filter(grepl('_1$', read_file) | grepl('_R1_', read_file))
 
-mapping_stats <- read_tsv("../Tables/read_numbers.txt",
+mapping_stats <- read_tsv("Tables/read_numbers.txt",
                           col_types = cols(sample = 'c'),
-                          trim_ws = TRUE)
+                          trim_ws = TRUE) %>%
+  mutate(sample = str_extract(sample, "^[^-]+")) %>% 
+  group_by(sample) %>% 
+  summarise_each("sum")
 
 
 total_reads <- combined %>%
@@ -147,7 +173,7 @@ final_stats %>%
 
 
 full_join(LibraryInfo, final_stats, by='Sample') %>% 
-  write_tsv("../Tables/CountSummary.txt")
+  write_tsv("Tables/CountSummary.txt")
 
 ```
 
@@ -223,7 +249,7 @@ PlotTimepoint<-function(geneID, counts, fittedBias, target, ages, title) {
   plot
 }
 
-fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+fittedBias <- read_delim("Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
          ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
@@ -232,7 +258,7 @@ fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_doub
 fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
 fittedBias <-  filter(fittedBias, ageBin != '12-19')
 
-counts <- read_delim("../Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+counts <- read_delim("Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
 Fig3a <- PlotTimepoint('GABRA1', counts, fittedBias, LibraryInfo, '14', 'GABRA1')
 Fig3b <- PlotTimepoint('GRIN2A', counts, fittedBias, LibraryInfo, '14', 'GRIN2A')
@@ -242,51 +268,39 @@ Fig3d <- PlotTimepoint('EOMES', counts, fittedBias, LibraryInfo, '14', 'EOMES')
 grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
 ```
 
+# Genes that are DE in combined analysis
 
-- Total of 452 DE (FDR<0.1) genes when all 105 samples analysed together
-- 261 are higher in males and 191 are higher in Females
-- Of these, 92 are also DE in at least one of the samples subsetted by age
-- 41 are on chrX and 20 are on chrY
+- LINC01597 consistently 2 fold higher in males at all timepoints
+- X chromosome genes consistently slightly lower in males at all timepoints
 ```{r}
-#Genes that are DE in combined analysis
-all_DE <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_12_20_HDBR_excl_15641_18432_16491_PCW_FDR_0.1_edgeR/tables/FemaleUp.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  bind_rows(read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_12_20_HDBR_excl_15641_18432_16491_PCW_FDR_0.1_edgeR/tables/MaleUp.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)) %>%
-  mutate(Id = gsub('\\..*', '', Id))
-all_DE_by_week <- all_DE %>% 
-  dplyr::select(-Male, -Female, -FC, -log2FoldChange) %>%
-  left_join(Fold_changes, by='Id') %>%
-  mutate(gene_name = GeneID, ChrType=ifelse(chr=='chrX', 'chrX', ifelse(chr=='chrY', 'chrY', 'autosome')))
 
-all_DE_by_week_matrix <- all_DE_by_week %>% 
-  dplyr::select(Id, Chr, GeneID, sig, week) %>%
-  spread(week, sig) %>% 
-  mutate(total = rowSums(.[4:8]))
 
-all_DE_by_week_matrix <- all_DE_by_week_matrix %>%
-  full_join(dplyr::select(all_DE, Id, log2FoldChange))
-
-all_DE_by_week_matrix %>%
-  arrange(desc(total)) %>% 
-  dplyr::select(-total)
-
-dplyr::summarise(all_DE_by_week_matrix, TotalDE = n()) %>%
-  bind_cols(filter(all_DE_by_week_matrix, log2FoldChange > 0) %>%
-  dplyr::summarise(MaleUp = n())) %>%
-  bind_cols(filter(all_DE_by_week_matrix, log2FoldChange < 0) %>%
-  dplyr::summarise(FemaleUp = n())) %>%
-  bind_cols(filter(all_DE_by_week_matrix, Chr == 'chrY') %>% 
-  dplyr::summarise(ChrY = n())) %>%
-  bind_cols(filter(all_DE_by_week_matrix, Chr == 'chrX') %>% 
-  dplyr::summarise(ChrX = n())) %>%
-  bind_cols(filter(all_DE_by_week_matrix, total > 0) %>%
-  dplyr::summarise(DE_by_week = n()))
-
+all_DE_by_week <- filter(Fold_changes, padj < 0.1 & ageBin=='12-19') %>% 
+  select(Id) %>%
+  left_join(Fold_changes) %>% 
+  mutate(ChrType=ifelse(Chr=='chrX', 'chrX', ifelse(Chr=='chrY', 'chrY', 'autosome')))
 
 PlotFC_by_ChrType(all_DE_by_week, 'All DE')
-all_DE_by_week %>% filter(ChrType != 'chrY' & gene_name != 'XIST') %>%
+all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
   PlotFC_by_ChrType("Non Y/XIST DE")
+```
+
+# Genes that are DE in any analysis
+
+- There are a number of autosomal genes that are expressed in both sexes at week 12, only in females at week 13 and in neither sex at later timepoints
+```{r}
+all_DE_by_week <- filter(Fold_changes, padj < 0.1) %>% 
+  select(Id) %>%
+  group_by(Id) %>%
+  summarise(n=n()) %>% #don't actually need this info, but I want one row per Id
+  left_join(Fold_changes) %>% 
+  mutate(ChrType=ifelse(Chr=='chrX', 'chrX', ifelse(Chr=='chrY', 'chrY', 'autosome')))
+
+PlotFC_by_ChrType(all_DE_by_week, 'All DE')
+all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
+  PlotFC_by_ChrType("Non Y/XIST DE")
+
+
 ```
 
 ```{r}
