@@ -13,9 +13,9 @@ library("optparse")
 option_list <- list(
   make_option(c("-v", "--varInt"), type="character", default="Sex", 
               help="Variable of interest (either Sex or PCW)"),
-  make_option(c("-m", "--min"), type="integer", default=NULL, 
+  make_option(c("-m", "--min"), type="integer", default=12, 
               help="minimum age (PCW)", metavar="minimum age"),
-  make_option(c("-x", "--max"), type="integer", default=NULL, 
+  make_option(c("-x", "--max"), type="integer", default=13, 
               help="maximum age (PCW)", metavar="maximum age"),
   make_option(c("-r", "--rin"), type="numeric", default=NA, 
               help="minimum RIN", metavar="minimum RIN"),
@@ -33,6 +33,8 @@ option_list <- list(
               help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
   make_option(c("-e", "--exclude"), type="character", default='', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
+  make_option(c("-s", "--sex_chromosomes"), action='store_true', type="logical", default=FALSE, 
+              help="Exclude sex chromosomes", metavar="sex_chromosomes"),
   make_option(c("-i", "--interaction"), type="character", default="", 
               help="Cofactors to interact with varInt", metavar = 'interact')
   
@@ -63,8 +65,6 @@ if (! opt$interact == "" & ! opt$tool == 'DESeqLRT') {
 PCW_cutoff <- c(opt$min, opt$max)
 RIN_cutoff <- opt$rin
 alpha <- opt$pvalue 
-BrainBank <- opt$brainbank
-exclude_sex <- opt$sex_chromosomes
 male <- opt$male
 female <- opt$female
 varInt <- opt$varInt  # factor of interest
@@ -90,7 +90,8 @@ projectName <- paste0(varInt,
        '_',
        opt$tool,
        ifelse(length(exclude > 0),
-              paste(c(BrainBank, '_excl', exclude), collapse='_', sep='_'), '')
+              paste(c('_excl', exclude), collapse='_', sep='_'), ''),
+       ifelse(opt$sex_chromosomes, '_autosomes', '')
 )                         # name of the project
 
 
@@ -133,7 +134,6 @@ if (opt$tool == 'DESeqLRT') {
 }
 typeTrans <- "VST"                                   # transformation for PCA/clustering: "VST" or "rlog"
 locfunc <- "median"                                  # "median" (default) or "shorth" to estimate the size factors
-excludedFeaturesFile<-NULL
 
 ################################################################################
 ###                             running script                               ###
@@ -175,6 +175,14 @@ if (!is.null(male)) {
 
 # loading counts
 counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
+
+if (opt$sex_chromosomes) {
+  excludedFeatures <- read_tsv("Data/genes.txt") %>% 
+    filter(seqid == 'chrX' | seqid == 'chrY') %>% 
+    dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
+  
+  counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+}
 
 dir.create(workDir)
 setwd(workDir)
