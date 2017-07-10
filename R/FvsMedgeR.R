@@ -220,9 +220,11 @@ if ( opt$tool == 'EdgeR' ) {
     out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
                            locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
                            cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
-    mcols(out.DESeq2$dds)$maxCooks <- apply(assays(out.DESeq2$dds)[["cooks"]], 1, max)
     if (is.numeric(cooksCutoff)) {
-      out.DESeq2$results$Male_vs_Female$pvalue[mcols(out.DESeq2$dds)$maxCooks > cooksCutoff] <- NA
+      cooksFiltered <- data.frame(out.DESeq2$results$Male_vs_Female)
+      cooksFiltered$maxCooks <- apply(assays(out.DESeq2$dds)[["cooks"]], 1, max)
+      cooksFiltered <- cooksFiltered %>% mutate(pvalue = ifelse(is.na(padj) | maxCooks > cooksCutoff, NA, pvalue))
+      out.DESeq2$results$Male_vs_Female$pvalue <- cooksFiltered$pvalue
       out.DESeq2$results$Male_vs_Female$padj <- p.adjust(out.DESeq2$results$Male_vs_Female$pvalue, method="BH")
     }  
   } else if (testMethod=='LRT' ) {
@@ -273,13 +275,21 @@ Downregulated <- read.delim(paste('tables', list.files('tables', pattern = ".dow
     dplyr::select(one_of(col_names))
 right_join(gene_info, Downregulated) %>% 
     write_tsv(downfile)
-  
-Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE)  %>% 
-    filter(! is.na(log2FoldChange)) %>%
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-    dplyr::select(one_of(col_names))
-  right_join(gene_info, Complete) %>% 
-    write_tsv(paste0("tables/BG", ageBin, ".txt"))
+
+# In the case of DESeq, some genes with high expression were filtered out on the basis of high Cooks distance
+# This means that we can't use genes with padj == na to determine background
+# For DESeq, I am now extracting the filtering threshold and using it to filter the background
+Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE) 
+if (opt$tool == 'EdgeR') {
+    Complete <- Complete %>% filter(! is.na(log2FoldChange))
+} else{
+    Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$Male_vs_Female)$filterThreshold)
+}
+Complete <- Complete %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
+  dplyr::select(one_of(col_names))
+
+right_join(gene_info, Complete) %>% 
+  write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
 # generating HTML report
 if ( opt$tool == 'EdgeR' ) {
