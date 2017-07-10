@@ -34,7 +34,7 @@ bash Bash/RunEdgeR.sh
 To Run JunctionSeq:
 ```
 mkdir JunctionSeq
-find Mappings/ -name *.chr.bam | grep -v 1117 | sort | xargs -n 1 qsub Bash/QoRTs.sh
+find Mappings/ -name *.sort.bam | grep -v chr | sort | xargs -n 1 qsub Bash/QoRTs.sh
 echo -e 'unique.ID\tsample.ID' > JunctionSeq/decoder.byUID.txt
 cut -f 2 Data/sequences.txt | grep '-' | sort | uniq | perl -pe 's/([^-]+)(.*)/$1$2\t$1/' >> JunctionSeq/decoder.byUID.txt 
 qsub Bash/MergeQoRTs.sh JunctionSeq
