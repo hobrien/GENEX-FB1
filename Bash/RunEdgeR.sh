@@ -34,12 +34,12 @@ Rscript R/FvsMedgeR.R --min 15 --max 17 --tool DESeq --sex_chromosomes
 Rscript R/FvsMedgeR.R --min 17 --max 20 --tool DESeq --sex_chromosomes
 
 
-Rscript R/FvsMedgeR.R --min 12 --max 20 --cofactor PCW
-Rscript R/FvsMedgeR.R --min 12 --max 13
-Rscript R/FvsMedgeR.R --min 13 --max 14
-Rscript R/FvsMedgeR.R --min 14 --max 15
-Rscript R/FvsMedgeR.R --min 15 --max 17
-Rscript R/FvsMedgeR.R --min 17 --max 20
+Rscript R/FvsMedgeR.R --min 12 --max 20 --cofactor PCW --tool EdgeR
+Rscript R/FvsMedgeR.R --min 12 --max 13 --tool EdgeR
+Rscript R/FvsMedgeR.R --min 13 --max 14 --tool EdgeR
+Rscript R/FvsMedgeR.R --min 14 --max 15 --tool EdgeR
+Rscript R/FvsMedgeR.R --min 15 --max 17 --tool EdgeR
+Rscript R/FvsMedgeR.R --min 17 --max 20 --tool EdgeR
 
 # Rscript R/FvsMedgeR.R --min 12 --max 20 -cofactor PCW -r 5
 # Rscript R/FvsMedgeR.R --min 12 --max 13 -r 5

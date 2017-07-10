@@ -29,7 +29,7 @@ option_list <- list(
               help="number of female samples"),
   make_option(c("-b", "--batch"), type="character", default="RIN,ReadLength", 
               help="factors to be used as batch correction"),
-  make_option(c("-t", "--tool"), type="character", default="EdgeR", 
+  make_option(c("-t", "--tool"), type="character", default="DESeq", 
               help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
   make_option(c("-e", "--exclude"), type="character", default='', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
