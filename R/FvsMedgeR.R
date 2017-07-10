@@ -275,7 +275,7 @@ right_join(gene_info, Downregulated) %>%
     write_tsv(downfile)
   
 Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE)  %>% 
-    filter(! is.na(padj)) %>%
+    filter(! is.na(log2FoldChange)) %>%
     mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(one_of(col_names))
   right_join(gene_info, Complete) %>% 
