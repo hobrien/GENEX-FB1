@@ -13,6 +13,8 @@ library(gridExtra)
 library(clusterProfiler)
 library(GGally)
 library(stringr)
+library(matrixStats)
+library(ggbiplot)
 #setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
@@ -395,6 +397,53 @@ PlotExpression<-function(geneID, MalevsFemale_complete, target) {
 PlotExpression('CRNDE', MalevsFemale_complete, LibraryInfo)
 PlotExpression('GDA', MalevsFemale_complete, LibraryInfo)
 ```
+# PCA plot
+
+- there is some separation of new and old samples along PC1
+
+```{r pca}
+vst <- read_tsv('../Results/Sex_12_FDR_0.1_DESeq/tables/counts_vst.txt')
+metadata<-data.frame(Sample = colnames(select(vst, -Id))) %>%
+  left_join(LibraryInfo)
+
+vst$var <- rowVars(as.matrix(select(vst, -Id)))
+pca <- arrange(vst, desc(var)) %>% .[1:500,] %>% select(-Id, -var) %>% t() %>% prcomp()
+prp <- pca$sdev^2 * 100 / sum(pca$sdev^2)
+prp <- round(prp[1:3],2)
+
+pca_df <- fortify(pca)
+pca_df$Sample <- row.names(pca_df)
+pca_df <- left_join(pca_df, LibraryInfo)
+
+
+palette <- 6
+type = "qual"
+# axes 1 et 2
+
+p1 <- ggplot(pca_df, aes(x=PC1, y=PC2, colour=Sex, shape=Analysis)) + 
+  geom_point() +
+  stat_ellipse(aes(group = Sex)) +
+  scale_colour_brewer(type = type, palette = palette) +
+  xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
+  ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
+  fte_theme() +
+  theme(aspect.ratio=1)
+
+	# axes 1 et 3
+p2 <- ggplot(pca_df, aes(x=PC1, y=PC3, colour=Sex, shape=Analysis)) + 
+  geom_point() +
+  stat_ellipse(aes(group = Sex)) +
+  scale_colour_brewer(type = type, palette = palette) +
+  xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
+  ylab(sprintf("PC3 (%0.1f%% explained var.)", prp[3])) +
+  fte_theme() +
+  theme(aspect.ratio=1) +
+  theme(legend.position=c(.9,.9))
+
+
+grid.arrange(p1, p2, ncol=2)
+```
+
 
 ```{r}
 p1 <- all_DE %>%
