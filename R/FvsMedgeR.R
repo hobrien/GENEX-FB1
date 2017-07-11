@@ -5,7 +5,7 @@
 ### designed to be executed with a modified version of SARTools 1.3.0 
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+#setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
@@ -252,7 +252,7 @@ save.image(file=paste0(projectName, ".RData"))
 
 gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
-  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
+  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, gene_type)
 
 if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")

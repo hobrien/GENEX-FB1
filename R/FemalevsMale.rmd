@@ -30,7 +30,7 @@ gene_info <- read_tsv("../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
          ChrType = ifelse(seqid == 'ChrX' | seqid == 'ChrY', seqid, 'autosomal')
          ) %>%
-  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType)
+  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType, gene_type)
 
 MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
@@ -295,6 +295,21 @@ ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') +
     ggtitle('A.') +
     theme(legend.position = 'right')
 filter(sigGenes, ChrType=='autosome')
+
+sigGenes <- sigGenes %>% left_join(select(gene_info, Id, gene_type)) 
+
+ggplot(sigGenes, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
+  facet_grid(ChrType ~ ageBin) +
+    figure_theme() +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    #scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Fetal sex') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
 ```
 
 
