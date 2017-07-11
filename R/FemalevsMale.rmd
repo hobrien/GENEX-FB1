@@ -130,7 +130,7 @@ grid.arrange(p1, p2, ncol=2)
 
 ```{r }
 count_matrix <- MalevsFemale_complete %>%
-  dplyr::select(-Id, -SYMBOL, -Chr, -starts_with('norm'), -baseMean, -Female, -Male, -FC, -log2FoldChange, -pvalue, -padj, -tagwise.dispersion, -trended.dispersion, -Chr, -ChrType)
+  dplyr::select(-Id, -SYMBOL, -Chr, -starts_with('norm'), -baseMean, -Female, -Male, -FC, -log2FoldChange, -pvalue, -padj, -tagwise.dispersion, -trended.dispersion, -Chr, -ChrType, -gene_type)
 Counts <- count_matrix %>% 
   tidyr::gather(Sample, Count) %>% 
   mutate(Sample = as.character(Sample)) %>% 
@@ -235,33 +235,44 @@ p1
 - DESeq produces 91 genes using Wald test or 98 using LRT
 - 11638 DE genes when analysing PCW with DESeq LRT
 
+- As we suspected, almost all of the chrX genes that are up in males are in the PAR
+- Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
+- PC genes and lincRNAs make up 54% and 12% of background genes, respectively
+- The Y also has a lot of DE pseudogenes
+
 ```{r}
 
-sigGenesDESeq <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+sigGenesDESeq <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
   #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
   mutate(ageBin='12-19') %>%
   bind_rows(
-    read_delim("../Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='12')
   ) %>%
   bind_rows(
-    read_delim("../Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='13')
   ) %>%
   bind_rows(
-    read_delim("../Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='14')
   ) %>%
   bind_rows(
-    read_delim("../Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE,  col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='15-16')
   ) %>%
   bind_rows(
-    read_delim("../Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE,  col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='17-19')
   ) %>%
@@ -280,10 +291,10 @@ sigGenesEdgeR <- fittedBias %>%
   mutate(Method='EdgeR', analysis=paste0(Id, ageBin))
 
 
-sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis)) %>% 
+sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis') %>% 
   mutate(Method='Both') %>%
-  bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis))) %>%
-  bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis))) %>%
+  bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis')) %>%
+  bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis), by='analysis')) %>%
   mutate(ageBin=relevel(factor(ageBin), ref='12-19')) %>%
   mutate(ChrType=ifelse(SYMBOL %in% par$`Approved Symbol`, 'PAR', ChrType))
 
@@ -303,7 +314,7 @@ ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') +
 
 #filter(sigGenes, ChrType=='autosome')
 
-sigGenes <- sigGenes %>% left_join(select(gene_info, Id, gene_type)) 
+sigGenes <- sigGenes %>% left_join(select(gene_info, Id, gene_type), by='Id') 
 
 ggplot(filter(sigGenes, Method != 'EdgeR'), aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
   facet_grid(ChrType ~ ageBin) +
@@ -321,7 +332,31 @@ ggplot(filter(sigGenes, Method != 'EdgeR'), aes(x=Sex, fill=gene_type)) + geom_b
 sigGenes %>% group_by(ChrType, ageBin, gene_type, Method) %>% 
   summarise(n=n()) %>%
   spread(Method, n)
+select(sigGenes, gene_type, ChrType) %>% table() %>% as.data.frame()
 
+sigAutosomesNum <- dim(filter(sigGenes, ChrType == 'autosome'))[1]
+sigGenes %>% filter(ChrType == 'autosome') %>% 
+  group_by(gene_type) %>% 
+  summarise(n=n()/sigAutosomesNum) %>% 
+  arrange(desc(n))
+
+BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(
+  Id = col_character(),
+  SYMBOL = col_character(),
+  Chr = col_character(),
+  baseMean = col_double(),
+  Male = col_integer(),
+  Female = col_integer(),
+  FC = col_double(),
+  log2FoldChange = col_double(),
+  pvalue = col_double(),
+  padj = col_double()
+))
+select(gene_info, Id, gene_type) %>% 
+  right_join(BG, by='Id') %>% 
+  group_by(gene_type) %>%
+  summarise(n=n()/dim(BG)[1]) %>%
+  arrange(desc(n))
 ```
 
 
