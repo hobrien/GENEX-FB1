@@ -93,7 +93,7 @@ projectName <- paste0(varInt,
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
        ifelse(opt$sex_chromosomes, '_autosomes', '')
 )                         # name of the project
-
+print(paste("Saving output to", projectName))
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
 
