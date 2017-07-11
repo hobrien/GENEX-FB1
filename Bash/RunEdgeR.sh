@@ -47,3 +47,8 @@ Rscript R/FvsMedgeR.R --min 17 --max 20 --tool EdgeR
 # Rscript R/FvsMedgeR.R --min 14 --max 15 -r 5
 # Rscript R/FvsMedgeR.R --min 15 --max 17 -r 5
 # Rscript R/FvsMedgeR.R --min 17 --max 20 -r 5
+
+for SampleID in 17812	18282	18349	18355	18687	19043	17921	19031	17221	18015	16428	16488	16640	16929	17053	17071	18529	18856	11449 11511 11900 12116 12134 12153 12972
+do
+    Rscript Rscript R/FvsMedgeR.R --min 14 --max 15 --exclude $SampleID --tool DESeq
+done
