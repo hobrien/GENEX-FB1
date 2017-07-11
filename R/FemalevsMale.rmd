@@ -7,38 +7,35 @@ output: html_notebook
 knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
                       echo=FALSE, 
                       warning=FALSE, 
-                      message=FALSE,
-                      root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
-```
-
-```{r, incluse=FALSE}
+                      message=FALSE)
 library(tidyverse)
 library(gridExtra)
 library(clusterProfiler)
 library(GGally)
 library(stringr)
-source("Shiny/GENEX-FB1/FormatGGplot.R")
+#setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
-LibraryInfo <- read_tsv("Data/SampleInfo.txt", 
+LibraryInfo <- read_tsv("../Data/SampleInfo.txt", 
                         col_types=cols(Sample='c')
                        ) %>%
-full_join(read_tsv("Data/experiment.txt", 
+full_join(read_tsv("../Data/experiment.txt", 
                         col_types=cols(Sample='c')
                        )
           )
 
-gene_info <- read_tsv("Data/genes.txt") %>%
+gene_info <- read_tsv("../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
          ChrType = ifelse(seqid == 'ChrX' | seqid == 'ChrY', seqid, 'autosomal')
          ) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType)
 
-MalevsFemale_complete <- read_tsv("Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
+MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
 
 MalevsFemale_complete <- right_join(gene_info, MalevsFemale_complete)
 
-Fold_changes <- read_tsv("Shiny/GENEX-FB1/Data/fitted.txt")
+Fold_changes <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt")
 
 CPM1 <- Fold_changes %>%
   filter(! is.na(log2FoldChange)) %>%
@@ -49,7 +46,7 @@ CPM1 <- Fold_changes %>%
                      ifelse(ageBin=='17-19', 18, as.numeric(ageBin))
         ))
 
-fittedBias <- read_delim("Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
          ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
@@ -135,12 +132,12 @@ Counts <- count_matrix %>%
   group_by(Sample) %>%
   dplyr::summarise(TotalCount=sum(Count))
 
-lengths <- read_delim("FastQC/seq_lengths.txt", 
+lengths <- read_delim("../FastQC/seq_lengths.txt", 
                       delim='\t', 
                       col_names=c('read_file', 'num_reads'), 
                       col_types=cols(read_file='c', num_reads='i')
                       )
-SeqInfo <- read_delim("Data/sequences.txt", 
+SeqInfo <- read_delim("../Data/sequences.txt", 
                      delim='\t',
                      col_names=c('read_file', 'read_group', 'centre', 'folder', 'trimmed'),
                      col_types=cols(read_file='c', read_group='c', centre='c', folder='c', trimmed='c')
@@ -151,7 +148,7 @@ combined <- left_join(SeqInfo, lengths, by='read_file') %>%
   separate(read_group, c('Sample', 'run'), fill='right', remove=FALSE) %>%
   filter(grepl('_1$', read_file) | grepl('_R1_', read_file))
 
-mapping_stats <- read_tsv("Tables/read_numbers.txt",
+mapping_stats <- read_tsv("../Tables/read_numbers.txt",
                           col_types = cols(sample = 'c'),
                           trim_ws = TRUE) %>%
   mutate(sample = str_extract(sample, "^[^-]+")) %>% 
@@ -182,7 +179,7 @@ final_stats %>%
 
 
 full_join(LibraryInfo, final_stats, by='Sample') %>% 
-  write_tsv("Tables/CountSummary.txt")
+  write_tsv("../Tables/CountSummary.txt")
 
 ```
 
@@ -235,31 +232,31 @@ p1
 
 ```{r}
 
-sigGenesDESeq <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+sigGenesDESeq <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
   mutate(ageBin='12-19') %>%
   bind_rows(
-    read_delim("Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='12')
   ) %>%
   bind_rows(
-    read_delim("Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='13')
   ) %>%
   bind_rows(
-    read_delim("Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='14')
   ) %>%
   bind_rows(
-    read_delim("Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='15-16')
   ) %>%
   bind_rows(
-    read_delim("Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    read_delim("../Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
       #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
       mutate(ageBin='17-19')
   ) %>%
