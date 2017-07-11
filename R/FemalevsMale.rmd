@@ -28,9 +28,12 @@ full_join(read_tsv("../Data/experiment.txt",
 
 gene_info <- read_tsv("../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
-         ChrType = ifelse(seqid == 'ChrX' | seqid == 'ChrY', seqid, 'autosomal')
+         ChrType = ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal')
          ) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType, gene_type)
+
+par <- read_tsv("../Data/PARgenes.txt")
+gene_info <- mutate(gene_info, ChrType=ifelse(SYMBOL %in% par$`Approved Symbol`, 'PAR', ChrType))
 
 MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
@@ -281,12 +284,15 @@ sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis)) %>%
   mutate(Method='Both') %>%
   bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis))) %>%
   bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis))) %>%
-  mutate(ageBin=relevel(factor(ageBin), ref='12-19'))
+  mutate(ageBin=relevel(factor(ageBin), ref='12-19')) %>%
+  mutate(ChrType=ifelse(SYMBOL %in% par$`Approved Symbol`, 'PAR', ChrType))
+
+
 ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
   facet_grid(Method ~ ageBin) +
     figure_theme() +
     #scale_y_continuous(breaks=seq(100,1000,100)) +
-    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4,6)]) +
     theme(strip.switch.pad.grid = unit(10, 'cm')) +
     ylab('Number sex-biased genes (FDR<0.1)') +
     xlab('Fetal sex') +
@@ -294,11 +300,12 @@ ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') +
     theme(axis.title.x=element_text(size=9)) +
     ggtitle('A.') +
     theme(legend.position = 'right')
-filter(sigGenes, ChrType=='autosome')
+
+#filter(sigGenes, ChrType=='autosome')
 
 sigGenes <- sigGenes %>% left_join(select(gene_info, Id, gene_type)) 
 
-ggplot(sigGenes, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
+ggplot(filter(sigGenes, Method != 'EdgeR'), aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
   facet_grid(ChrType ~ ageBin) +
     figure_theme() +
     #scale_y_continuous(breaks=seq(100,1000,100)) +
@@ -308,8 +315,13 @@ ggplot(sigGenes, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') +
     xlab('Fetal sex') +
     theme(axis.title.y=element_text(size=9)) +
     theme(axis.title.x=element_text(size=9)) +
-    ggtitle('A.') +
+    ggtitle('DESeq Genes') +
     theme(legend.position = 'right')
+
+sigGenes %>% group_by(ChrType, ageBin, gene_type, Method) %>% 
+  summarise(n=n()) %>%
+  spread(Method, n)
+
 ```
 
 
