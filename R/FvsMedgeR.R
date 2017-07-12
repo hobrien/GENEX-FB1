@@ -148,7 +148,7 @@ LibraryInfo <- read_tsv(targetFile,
                         col_types = cols(.default = col_character())
 )
 LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) %>%
-  select(Sample, Files, Sex, PCW, RIN, ReadLength = `Read Length`, Sequencer) %>%
+  select(Sample, Files, Sex, PCW, RIN, ReadLength, Sequencer) %>%
   mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
   arrange(Sex)
 if (!is.na(RIN_cutoff)) {
