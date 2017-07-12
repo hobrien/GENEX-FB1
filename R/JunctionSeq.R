@@ -1,10 +1,10 @@
 library(JunctionSeq)
 
-decoder <- read.table("~/LabNotes/Carolina/decoder.bySample.txt",
+decoder <- read.table("JunctionSeqdecoder.bySample.txt",
                       header=TRUE,
                       stringsAsFactors=FALSE);
-gff.file <- "/c8000xd3/rnaseq-heath/Carolina/Counts/withNovel.forJunctionSeq.gff.gz"
-countFiles<- paste0("/c8000xd3/rnaseq-heath/Carolina/Counts/",
+gff.file <- "JunctionSeq/withNovel.forJunctionSeq.gff.gz"
+countFiles<- paste0("JunctionSeq/",
                     decoder$sample.ID,
                     "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz")
 
@@ -17,12 +17,12 @@ jscs <- runJunctionSeqAnalyses(sample.files = countFiles,
 )
 
 buildAllPlots(jscs=jscs,
-              outfile.prefix = "/c8000xd3/rnaseq-heath/Carolina/plotsJCT-2/",
+              outfile.prefix = "JunctionSeq/plotsJCT-2/",
               use.plotting.device = "png",
               FDR.threshold = 0.01)
 
 buildAllPlots(jscs=jscs,
-              outfile.prefix = "/c8000xd3/rnaseq-heath/Carolina/plotsJCT-3/",
+              outfile.prefix = "JunctionSeq/plotsJCT-3/",
               use.plotting.device = "png",
               FDR.threshold = 0.001)
-save.image(file="/c8000xd3/rnaseq-heath/Carolina/junctionSeq.RData")
+save.image(file="JunctionSeq/junctionSeq.RData")
