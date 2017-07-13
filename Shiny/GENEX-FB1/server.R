@@ -36,15 +36,13 @@ PlotExpression<-function(geneID, counts, target, ages) {
     dplyr::select(Sample, value) %>%
     left_join(target) %>%
     filter(PCW >= min & PCW <= max)
-  title<-paste0(geneID, ': p=', ', q=')
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
     geom_smooth() +
     ylab("normalised counts") +
     xlab('') +
     main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) +
-    ggtitle(title) 
+    scale_colour_brewer(type = "qual", palette = 6) 
   plot
 }
 
