@@ -117,12 +117,12 @@ shinyServer(function(input, output) {
     summary(cars)
   })
   
-  all_PCW = filter(fitted, ageBin=='12-19') %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW12 = filter(fitted, ageBin=='12') %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW13 = filter(fitted, ageBin=='13') %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW14 = filter(fitted, ageBin=='14') %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW15_16 = filter(fitted, ageBin=='15-16') %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW17_19 = filter(fitted, ageBin=='17-19') %>% dplyr::select(-ageBin) %>% arrange(padj)
+  all_PCW = filter(fitted, ageBin=='12-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  PCW12 = filter(fitted, ageBin=='12' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  PCW13 = filter(fitted, ageBin=='13' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  PCW14 = filter(fitted, ageBin=='14' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  PCW15_16 = filter(fitted, ageBin=='15-16' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  PCW17_19 = filter(fitted, ageBin=='17-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
   
   output$mytable1 <- DT::renderDataTable({
     DT::datatable(all_PCW[all_PCW[, input$p_type] < input$pvalue, ])
