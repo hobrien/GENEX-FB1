@@ -143,37 +143,37 @@ shinyServer(function(input, output) {
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
     content = function(file) {
-      write_tsv(all_PCW[all_PCW$padj < input$pvalue, ], file)
-    }
+      write_tsv(arrange_(all_PCW[all_PCW[, input$p_type] < input$pvalue, ], input$p_type), file)
+    }  
   )
   output$download12 <- downloadHandler(
     filename = function() { 'PCW12.txt' },
     content = function(file) {
-      write_tsv(PCW12[PCW12$padj < input$pvalue, ], file)
+      write_tsv(arrange_(PCW12[PCW12[, input$p_type] < input$pvalue, ], input$p_type), file)
     }
   )
   output$download13 <- downloadHandler(
     filename = function() { 'PCW13.txt' },
     content = function(file) {
-      write_tsv(PCW13[PCW13$padj < input$pvalue, ], file)
+      write_tsv(arrange_(PCW13[PCW13[, input$p_type] < input$pvalue, ], input$p_type), file)
     }
   )
   output$download14 <- downloadHandler(
     filename = function() { 'PCW14.txt' },
     content = function(file) {
-      write_tsv(PCW14[PCW14$padj < input$pvalue, ], file)
+      write_tsv(arrange_(PCW14[PCW14[, input$p_type] < input$pvalue, ], input$p_type), file)
     }
   )
   output$download15_16 <- downloadHandler(
     filename = function() { 'PCW15_16.txt' },
     content = function(file) {
-      write_tsv(PCW15_16[PCW15_16$padj < input$pvalue, ], file)
+      write_tsv(arrange_(PCW15_16[PCW15_16[, input$p_type] < input$pvalue, ], input$p_type), file)
     }
   )
   output$download17_19 <- downloadHandler(
     filename = function() { 'PCW17_19.txt' },
     content = function(file) {
-      write_tsv(PCW17_19[PCW17_19$padj < input$pvalue, ], file)
+      write_tsv(arrange_(PCW17_19[PCW17_19[, input$p_type] < input$pvalue, ], input$p_type), file)
     }
   )
   
