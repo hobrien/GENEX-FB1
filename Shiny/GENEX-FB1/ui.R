@@ -32,6 +32,9 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
            tabPanel("Table",
                      sidebarLayout(
                        sidebarPanel(
+                         checkboxGroupInput("ChrType", "Chromosome types", 
+                                            choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
+                                            inline = FALSE, width = NULL),
                          radioButtons("p_type", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,
                                       width = NULL),
                          sliderInput("pvalue", "p-value:", 

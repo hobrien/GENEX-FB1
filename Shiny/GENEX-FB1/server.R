@@ -30,7 +30,7 @@ PlotExpression<-function(geneID, counts, target, ages) {
   min <- ageSplit[1]
   max <- ageSplit[length(ageSplit)]
   data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr) %>%
+    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
@@ -52,7 +52,7 @@ PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   min <- ageSplit[1]
   max <- ageSplit[length(ageSplit)]
   data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr) %>%
+    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
@@ -99,7 +99,6 @@ PlotSampleSize<-function(target, ages){
   plot
 }
 
-# Define server logic required to draw a histogram
 shinyServer(function(input, output) {
    
   output$distPlot <- renderPlot({
@@ -123,57 +122,81 @@ shinyServer(function(input, output) {
   PCW17_19 = filter(fitted, ageBin=='17-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
   
   output$mytable1 <- DT::renderDataTable({
-    DT::datatable(all_PCW[all_PCW[, input$p_type] < input$pvalue, ])
+    all_PCW_filtered <- all_PCW %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(all_PCW_filtered[all_PCW_filtered[, input$p_type] < input$pvalue, ])
   })
   output$mytable2 <- DT::renderDataTable({
-    DT::datatable(PCW12[PCW12[, input$p_type] < input$pvalue, ])
+    PCW12_filtered <- PCW12 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(PCW12_filtered[PCW12_filtered[, input$p_type] < input$pvalue, ])
   })
   output$mytable3 <- DT::renderDataTable({
-    DT::datatable(PCW13[PCW13[, input$p_type] < input$pvalue, ])
+    PCW13_filtered <- PCW13 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(PCW13_filtered[PCW13_filtered[, input$p_type] < input$pvalue, ])
   })
   output$mytable4 <- DT::renderDataTable({
-    DT::datatable(PCW14[PCW14[, input$p_type] < input$pvalue, ])
+    PCW14_filtered <- PCW14 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(PCW14_filtered[PCW14_filtered[, input$p_type] < input$pvalue, ])
   })
   output$mytable5 <- DT::renderDataTable({
-    DT::datatable(PCW15_16[PCW15_16[, input$p_type] < input$pvalue, ])
+    PCW15_16_filtered <- PCW15_16 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(PCW15_16_filtered[PCW15_16_filtered[, input$p_type] < input$pvalue, ])
   })
   output$mytable6 <- DT::renderDataTable({
-    DT::datatable(PCW17_19[PCW17_19[, input$p_type] < input$pvalue, ])
+    PCW17_19_filtered <- PCW17_19 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
+    DT::datatable(PCW17_19_filtered[PCW17_19_filtered[, input$p_type] < input$pvalue, ])
   })
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
     content = function(file) {
-      write_tsv(arrange_(all_PCW[all_PCW[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(all_PCW[all_PCW[, input$p_type] < input$pvalue, ], input$p_type) %>%
+        filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }  
   )
   output$download12 <- downloadHandler(
     filename = function() { 'PCW12.txt' },
     content = function(file) {
-      write_tsv(arrange_(PCW12[PCW12[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(PCW12[PCW12[, input$p_type] < input$pvalue, ], input$p_type) %>%
+      filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }
   )
   output$download13 <- downloadHandler(
     filename = function() { 'PCW13.txt' },
     content = function(file) {
-      write_tsv(arrange_(PCW13[PCW13[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(PCW13[PCW13[, input$p_type] < input$pvalue, ], input$p_type) %>%
+      filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }
   )
   output$download14 <- downloadHandler(
     filename = function() { 'PCW14.txt' },
     content = function(file) {
-      write_tsv(arrange_(PCW14[PCW14[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(PCW14[PCW14[, input$p_type] < input$pvalue, ], input$p_type) %>%
+      filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }
   )
   output$download15_16 <- downloadHandler(
     filename = function() { 'PCW15_16.txt' },
     content = function(file) {
-      write_tsv(arrange_(PCW15_16[PCW15_16[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(PCW15_16[PCW15_16[, input$p_type] < input$pvalue, ], input$p_type) %>%
+      filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }
   )
   output$download17_19 <- downloadHandler(
     filename = function() { 'PCW17_19.txt' },
     content = function(file) {
-      write_tsv(arrange_(PCW17_19[PCW17_19[, input$p_type] < input$pvalue, ], input$p_type), file)
+      arrange_(PCW17_19[PCW17_19[, input$p_type] < input$pvalue, ], input$p_type) %>%
+      filter(ChrType %in% input$ChrType) %>% 
+        select(-ChrType) %>%
+        write_tsv(file)
     }
   )
   

@@ -8,9 +8,24 @@ library(stringr)
 # Genotypic effects. (If we grew the sample, we'd call it FB3 etc). 
 # We could also use GENEX for the adult brain samples (E.g. GENEX-AC (adult caudate)!
 setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
-gene_info <- read_tsv("Data/genes.txt") %>%
-  mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
-  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
+gene_info <- read_tsv("Data/genes.txt", col_types = cols(
+  seqid = col_character(),
+  source = col_character(),
+  feature = col_character(),
+  start = col_integer(),
+  end = col_integer(),
+  score = col_character(),
+  strand = col_integer(),
+  frame = col_character(),
+  gene_id = col_character(),
+  gene_type = col_character(),
+  gene_status = col_character(),
+  gene_name = col_character()
+)) %>%
+  mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
+         ChrType = ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal')
+  ) %>%
+  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType)
 
 
 counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
@@ -49,7 +64,7 @@ fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt
       mutate(ageBin='17-19')
   )
 
-right_join(gene_info, fittedBias) %>%
+right_join(gene_info, fittedBias) %>% View()
   write_tsv("Shiny/GENEX-FB1/Data/fitted.txt")
 
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
