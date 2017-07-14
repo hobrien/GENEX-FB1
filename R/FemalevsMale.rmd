@@ -10,11 +10,13 @@ knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
                       message=FALSE)
 library(tidyverse)
 library(gridExtra)
-library(clusterProfiler)
-library(GGally)
+#library(clusterProfiler)
+#library(GGally)
 library(stringr)
-library(matrixStats)
+#library(matrixStats)
 library(ggbiplot)
+library(stringr)
+library(genefilter) 
 #setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
@@ -23,10 +25,23 @@ LibraryInfo <- read_tsv("../Data/SampleInfo.txt",
                        ) %>%
 full_join(read_tsv("../Data/experiment.txt", 
                         col_types=cols(Sample='c')
-                       )
+                       ), by="Sample"
           )
 
-gene_info <- read_tsv("../Data/genes.txt") %>%
+gene_info <- read_tsv("../Data/genes.txt", col_types = cols(
+  seqid = col_character(),
+  source = col_character(),
+  feature = col_character(),
+  start = col_integer(),
+  end = col_integer(),
+  score = col_character(),
+  strand = col_integer(),
+  frame = col_character(),
+  gene_id = col_character(),
+  gene_type = col_character(),
+  gene_status = col_character(),
+  gene_name = col_character()
+)) %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
          ChrType = ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal')
          ) %>%
@@ -39,35 +54,62 @@ MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
 
 MalevsFemale_complete <- right_join(gene_info, MalevsFemale_complete)
+count_matrix <- MalevsFemale_complete %>%
+  dplyr::select(-Id, -SYMBOL, -Chr, -starts_with('norm'), -baseMean, -Female, -Male, -FC, -log2FoldChange, -pvalue, -padj, -tagwise.dispersion, -trended.dispersion, -Chr, -ChrType, -gene_type)
 
-Fold_changes <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt")
+DESeqfit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  DESeqfit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(DESeqfit)
+}
+DESeqfit <- DESeqfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='DESeq',
+         analysis=paste0(Id, ageBin)) %>%
+  left_join(select(gene_info, Id, ChrType), by='Id')
+sigGenesDESeq <- DESeqfit %>% filter(padj < .1 )
 
-CPM1 <- Fold_changes %>%
-  filter(! is.na(log2FoldChange)) %>%
-  group_by(ageBin) %>%
-  dplyr::summarise(n=n()) %>%
-  filter(ageBin != '12-19') %>%
-  mutate(week=ifelse(ageBin=='15-16', 15.5,
-                     ifelse(ageBin=='17-19', 18, as.numeric(ageBin))
-        ))
+EdgeRfit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  EdgeRfit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_EdgeR/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+    mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(EdgeRfit)
+}
+EdgeRfit <- EdgeRfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='EdgeRfit',
+         analysis=paste0(Id, ageBin)) %>%
+ left_join(select(gene_info, Id, ChrType), by='Id')
 
-fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
-         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
+sigGenesEdgeR <- EdgeRfit %>% filter(padj < .1 )
 
-fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
-fittedBias <-  filter(fittedBias, ageBin != '12-19')
+sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis') %>% 
+  mutate(Method='Both') %>%
+  bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis')) %>%
+  bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis), by='analysis')) %>%
+  mutate(ageBin=relevel(factor(ageBin), ref='12-19'))
+
 
 PlotFC_by_ChrType <- function(genes, set_name) {
-  genes <- filter(genes, ageBin != '12-19') %>%
-    mutate(week = ifelse(ageBin=='15-16', 15.5, ifelse(ageBin == '17-19', 18, as.numeric(ageBin))))
+  genes <- filter(genes, ageBin != '12_19' & ageBin != '12-19') %>%
+    mutate(week = ifelse(ageBin=='15_16' | ageBin=='15-16', 
+                         15.5, 
+                         ifelse(ageBin=='17_19' | ageBin=='17-19', 
+                                18, 
+                                as.numeric(ageBin)
+                                )
+                         )
+           )
   plot <- ggplot(genes, aes(x=week, y=log2FoldChange, group=Id)) +
-    geom_line(alpha=1, aes(colour=ChrType)) +
+    geom_line(alpha=1, aes(colour=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) +
     geom_point(colour='black', size=1, alpha=.25, data=filter(genes, padj<.1)) +
     scale_x_continuous(breaks=c(12,13,14,15.5,18), labels=c('12', '13', '14', '15-16', '17-19')) +
-    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) + 
+    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) + 
     main_theme() +
     ylab("<--- Female-biased        Male-biased --->") +
     xlab("Post Conception Week") +
@@ -129,8 +171,6 @@ grid.arrange(p1, p2, ncol=2)
 
 
 ```{r }
-count_matrix <- MalevsFemale_complete %>%
-  dplyr::select(-Id, -SYMBOL, -Chr, -starts_with('norm'), -baseMean, -Female, -Male, -FC, -log2FoldChange, -pvalue, -padj, -tagwise.dispersion, -trended.dispersion, -Chr, -ChrType, -gene_type)
 Counts <- count_matrix %>% 
   tidyr::gather(Sample, Count) %>% 
   mutate(Sample = as.character(Sample)) %>% 
@@ -193,6 +233,16 @@ full_join(LibraryInfo, final_stats, by='Sample') %>%
 
 
 ```{r}
+
+numFeatures <- DESeqfit %>%
+  filter(! is.na(log2FoldChange)) %>%
+  group_by(ageBin) %>%
+  dplyr::summarise(n=n()) %>%
+  filter(ageBin != '12-19' & ageBin != '12_19') %>%
+  mutate(week=ifelse(ageBin=='15-16' | ageBin=='15_16', 15.5,
+                     ifelse(ageBin=='17-19' | ageBin=='17_19', 18, as.numeric(ageBin))
+        ))
+
 feature_stats <- data.frame(Samples=c(ncol(count_matrix)), TotalFeatures=c(nrow(count_matrix)))
 feature_stats <- count_matrix %>%
   mutate(sum=rowSums(.)) %>%
@@ -214,7 +264,7 @@ p1 <- count_matrix %>%
   dplyr::summarise(n=n()) %>%
   full_join(dplyr::select(LibraryInfo, Sample, PCW, Sex)) %>% 
   ggplot(aes(x=PCW, y=n)) +
-    geom_bar(aes(x=week, y=n), stat='identity', data=CPM1) +
+    geom_bar(aes(x=week, y=n), stat='identity', data=numFeatures) +
     geom_jitter(aes(colour=Sex), height=0, width=.25) +
     main_theme() +
     scale_y_continuous(limits=c(0,66000), breaks=seq(0,60000,10000)) +
@@ -227,6 +277,8 @@ p1 <- count_matrix %>%
 p1
 
 ```
+# Compare EdgeR to DESeq
+
 - same # of genes in 12-19 PCW analysis when high/low read samples excluded
 - 2 less DE genes in 17-19 week analysis
 - 4 less in 13 PCW analysis
@@ -236,74 +288,13 @@ p1
 - 11638 DE genes when analysing PCW with DESeq LRT
 
 - As we suspected, almost all of the chrX genes that are up in males are in the PAR
-- Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
-- PC genes and lincRNAs make up 54% and 12% of background genes, respectively
-- The Y also has a lot of DE pseudogenes
 
 ```{r}
-
-sigGenesDESeq <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-  #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-  mutate(ageBin='12-19') %>%
-  bind_rows(
-    read_delim("../Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-      #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='12')
-  ) %>%
-  bind_rows(
-    read_delim("../Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-      #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='13')
-  ) %>%
-  bind_rows(
-    read_delim("../Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-      #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='14')
-  ) %>%
-  bind_rows(
-    read_delim("../Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE,  col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-      #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='15-16')
-  ) %>%
-  bind_rows(
-    read_delim("../Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE,  col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
-Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
-      #dplyr::select(Id, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='17-19')
-  ) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  filter(padj < .1 ) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
-         Method='DESeq',
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
-         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y'))),
-         analysis=paste0(Id, ageBin))
-
-
-sigGenesEdgeR <- fittedBias %>% 
-  bind_rows(fittedBiasAll) %>%
-  filter(padj < .1 ) %>%
-  mutate(Method='EdgeR', analysis=paste0(Id, ageBin))
-
-
-sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis') %>% 
-  mutate(Method='Both') %>%
-  bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis')) %>%
-  bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis), by='analysis')) %>%
-  mutate(ageBin=relevel(factor(ageBin), ref='12-19')) %>%
-  mutate(ChrType=ifelse(SYMBOL %in% par$`Approved Symbol`, 'PAR', ChrType))
-
-
-ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
+ggplot(sigGenes, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
   facet_grid(Method ~ ageBin) +
     figure_theme() +
     #scale_y_continuous(breaks=seq(100,1000,100)) +
-    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4,6)]) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
     theme(strip.switch.pad.grid = unit(10, 'cm')) +
     ylab('Number sex-biased genes (FDR<0.1)') +
     xlab('Fetal sex') +
@@ -313,32 +304,74 @@ ggplot(sigGenes, aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') +
     theme(legend.position = 'right')
 
 #filter(sigGenes, ChrType=='autosome')
+```
+- p-values are generally lower with DESeq then they are with EdgeR
+- A lot of genes that are DE with DESeq were not tested with EdgeR because the counts are low
+- A lor of the genes that are DE with EdgeR were thrown out by DESeq because of high maxCooks scores
 
-sigGenes <- sigGenes %>% left_join(select(gene_info, Id, gene_type), by='Id') 
-
-ggplot(filter(sigGenes, Method != 'EdgeR'), aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
-  facet_grid(ChrType ~ ageBin) +
+```{r}
+ggplot(DESeq_vs_EdgeR, aes(x=DESeq_pvalue, y=EdgeR_pvalue, colour=ageBin)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
     figure_theme() +
-    #scale_y_continuous(breaks=seq(100,1000,100)) +
-    #scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
-    theme(strip.switch.pad.grid = unit(10, 'cm')) +
-    ylab('Number sex-biased genes (FDR<0.1)') +
-    xlab('Fetal sex') +
-    theme(axis.title.y=element_text(size=9)) +
-    theme(axis.title.x=element_text(size=9)) +
-    ggtitle('DESeq Genes') +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
     theme(legend.position = 'right')
 
+
+ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('FDR corrected p-values') +
+    theme(legend.position = 'right')
+
+DESeqCooks <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", col_types = cols(.default = col_character())) %>%
+  select(Id, maxCooks) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  DESeqCooks <- read_tsv(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt"), col_types = cols(.default = col_character())) %>%
+  select(Id, maxCooks) %>%
+  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(DESeqCooks)
+}
+DESeqCooks <- DESeqCooks %>%  mutate(Id = sub("\\.[0-9]+", "", Id), analysis=paste0(Id, ageBin))
+DESeq_vs_EdgeR <- group_by(sigGenes, analysis) %>%
+  summarise(n=n()) %>%
+  left_join(DESeqfit, by='analysis') %>% 
+  select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
+  left_join(select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
+  left_join(select(DESeqCooks, analysis, maxCooks), by='analysis')
+
+mutate(DESeq_vs_EdgeR, EdgeR_filtering=ifelse(is.na(EdgeR_padj), 'not tested', 'tested')) %>%
+  group_by(EdgeR_filtering) %>% 
+  summarise(n=n(), mean_Expression=mean(baseMean))
+
+mutate(DESeq_vs_EdgeR, DESeq_filtering=ifelse(is.na(DESeq_padj), 'not tested', 'tested')) %>%
+  group_by(DESeq_filtering) %>% 
+  summarise(n=n(), mean_maxCooks=mean(maxCooks))
+
+```
+
+
+# Gene Types
+- Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
+- PC genes and lincRNAs make up 54% and 12% of background genes, respectively
+- The Y also has a lot of DE pseudogenes
+
+```{r}
 sigGenes %>% group_by(ChrType, ageBin, gene_type, Method) %>% 
   summarise(n=n()) %>%
   spread(Method, n)
-select(sigGenes, gene_type, ChrType) %>% table() %>% as.data.frame()
+#select(sigGenes, gene_type, ChrType) %>% table() %>% as.data.frame()
 
-sigAutosomesNum <- dim(filter(sigGenes, ChrType == 'autosome'))[1]
-sigGenes %>% filter(ChrType == 'autosome') %>% 
+sigAutosomesNum <- dim(filter(sigGenes, ChrType == 'autosomal'))[1]
+sigGenes %>% filter(ChrType == 'autosomal') %>% 
   group_by(gene_type) %>% 
-  summarise(n=n()/sigAutosomesNum) %>% 
-  arrange(desc(n))
+  summarise(autosomalDE=n()/sigAutosomesNum) %>% 
+  arrange(desc(autosomalDE))
 
 BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(
   Id = col_character(),
@@ -352,12 +385,66 @@ BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\
   pvalue = col_double(),
   padj = col_double()
 ))
-select(gene_info, Id, gene_type) %>% 
-  right_join(BG, by='Id') %>% 
+BG %>% 
   group_by(gene_type) %>%
-  summarise(n=n()/dim(BG)[1]) %>%
-  arrange(desc(n))
+  summarise(background=n()/dim(BG)[1]) %>%
+  arrange(desc(background))
+
+ggplot(sigGenesDESeq, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
+  facet_grid(ChrType ~ ageBin) +
+    figure_theme() +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    #scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Fetal sex') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('DESeq Genes') +
+    theme(legend.position = 'right')
 ```
+
+# Exclude Sex Chromosomes from analysis
+- Nominal p-values are very similar to analysis of all chromosomes
+- FDR correction is much more stringent without sex chromosomes, especially for the 12, 13 and 14 PCW analyses
+```{r}
+AutosomesFit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq_autosomes/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  AutosomesFit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq_autosomes/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin=ageBin) %>% 
+    bind_rows(AutosomesFit)
+}
+AutosomesFit <- AutosomesFit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='DESeq_autosomes',
+         analysis=paste0(Id, ageBin)) %>%
+  left_join(select(gene_info, Id, ChrType), by='Id')
+sigAutosomes <- AutosomesFit %>% filter(padj < .1 )
+
+
+AutosomeExclusion <- filter(sigGenesDESeq, ChrType=='autosomal') %>% select(analysis, XYpvalue=pvalue, XYpadj=padj, ageBin) %>% left_join(select(AutosomesFit, analysis, Autosomes_pvalue=pvalue, Autosomes_padj=padj), by='analysis')
+ggplot(AutosomeExclusion, aes(x=XYpvalue, y=Autosomes_pvalue, colour=ageBin)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    figure_theme() +
+    xlab('Sex Chromosomes Included') +
+    ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(AutosomeExclusion, aes(x=XYpadj, y=Autosomes_padj, colour=ageBin)) + geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    xlab('Sex Chromosomes Included') +
+    ylab('Sex Chromosomes Excluded') +
+    ggtitle('FDR corrected p-values') +
+    theme(legend.position = 'right')
+```
+
+
 
 
 
@@ -368,26 +455,29 @@ select(gene_info, Id, gene_type) %>%
 ```{r}
 
 
-all_DE_by_week <- filter(Fold_changes, padj < 0.1 & ageBin=='12-19') %>% 
+all_DE_by_week <- filter(DESeqfit, padj < 0.1 & ageBin=='12-19') %>% 
   select(Id) %>%
-  left_join(Fold_changes) %>% 
-  mutate(ChrType=ifelse(Chr=='chrX', 'chrX', ifelse(Chr=='chrY', 'chrY', 'autosome')))
+  left_join(DESeqfit)
 
 PlotFC_by_ChrType(all_DE_by_week, 'All DE')
 all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
+  mutate(ChrType=factor(ChrType, levels=c('autosomal', 'chrX', 'chrY', 'PAR'))) %>%
   PlotFC_by_ChrType("Non Y/XIST DE")
 ```
 
 # Genes that are DE in any analysis
 
 - There are a number of autosomal genes that are expressed in both sexes at week 12, only in females at week 13 and in neither sex at later timepoints
+    - This pattern is not aparant in the DESeq results
+    
+- There are clearly true positives being filtered out by filtering on maxCooks because XIST is only significant at one time point.
+
 ```{r}
-all_DE_by_week <- filter(Fold_changes, padj < 0.1) %>% 
+all_DE_by_week <- sigGenes %>% 
   select(Id) %>%
   group_by(Id) %>%
-  #summarise(n=n()) %>% #don't actually need this info, but I want one row per Id
-  left_join(Fold_changes) %>% 
-  mutate(ChrType=ifelse(Chr=='chrX', 'chrX', ifelse(Chr=='chrY', 'chrY', 'autosome')))
+  summarise(n=n()) %>% #don't actually need this info, but I want one row per Id
+  left_join(DESeqfit)
 
 PlotFC_by_ChrType(all_DE_by_week, 'All DE')
 all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
@@ -411,7 +501,7 @@ PlotTimepoint<-function(geneID, MalevsFemale_complete, fittedBias, target, ages,
     left_join(target) %>%
     filter(PCW >= min & PCW <= max)
   mean <- filter(fittedBias, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
-  fc <- mean$log2FoldDiff[1] %>% format(digits=2)
+  fc <- mean$log2FoldChange[1] %>% format(digits=2)
   pval <- mean$pvalue[1]
   qval <- mean$padj[1]
   mean <- mean %>% dplyr::select(Male, Female) %>%
@@ -429,10 +519,10 @@ PlotTimepoint<-function(geneID, MalevsFemale_complete, fittedBias, target, ages,
 }
 
 
-Fig3a <- PlotTimepoint('GABRA1', MalevsFemale_complete, fittedBias, LibraryInfo, '14', 'GABRA1')
-Fig3b <- PlotTimepoint('GRIN2A', MalevsFemale_complete, fittedBias, LibraryInfo, '14', 'GRIN2A')
-Fig3c <- PlotTimepoint('NES', MalevsFemale_complete, fittedBias, LibraryInfo, '14', 'NES')
-Fig3d <- PlotTimepoint('EOMES', MalevsFemale_complete, fittedBias, LibraryInfo, '14', 'EOMES')
+Fig3a <- PlotTimepoint('GABRA1', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'GABRA1')
+Fig3b <- PlotTimepoint('GRIN2A', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'GRIN2A')
+Fig3c <- PlotTimepoint('NES', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'NES')
+Fig3d <- PlotTimepoint('EOMES', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'EOMES')
 
 grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
 ```
@@ -461,10 +551,10 @@ PlotExpression('GDA', MalevsFemale_complete, LibraryInfo)
 ```
 # PCA plot
 
-- there is some separation of new and old samples along PC1
+- there is pretty strong separation of new and old samples along PC1
 
 ```{r pca}
-vst <- read_tsv('../Results/Sex_12_FDR_0.1_DESeq/tables/counts_vst.txt')
+vst <- read_tsv('../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/counts_vst.txt')
 metadata<-data.frame(Sample = colnames(select(vst, -Id))) %>%
   left_join(LibraryInfo)
 
@@ -507,463 +597,3 @@ grid.arrange(p1, p2, ncol=2)
 ```
 
 
-```{r}
-p1 <- all_DE %>%
-    mutate(ChrType=ifelse(Chr=='chrX', 'chrX', ifelse(Chr=='chrY', 'chrY', 'autosome')), Sex = ifelse(log2FoldChange < 0, 'F', 'M')) %>%
-  ggplot(aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
-    tufte_theme() +
-    scale_y_continuous(breaks=seq(100,1000,100)) +
-    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
-    theme(legend.position='right') +
-    theme(strip.switch.pad.grid = unit(10, 'cm')) +
-    ylab('Number DE genes (FDR<0.1)') +
-    xlab('Fetal Sex') +
-    ggtitle("All Ages (12-19 PCW)")
-  
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/AllSigBar.png", bg="transparent", width=128, height=96, units='mm', res=227)
-p1
-dev.off()
-p1
-
-p2 <- Fold_changes %>% filter(sig == 1) %>%
-  mutate(week = paste(ifelse(week > 16, 
-                      '15-16',
-                      ifelse(week >= 15, 
-                             '17-19', 
-                             week)), 'PCW'),
-         Sex = ifelse(log2FoldChange < 0, 'F', 'M')) %>% 
-  left_join(dplyr::select(MalevsFemale_complete, Id, ChrType)) %>%
-  ggplot(aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
-  facet_grid(. ~ week) +
-    tufte_theme() +
-    scale_y_continuous(breaks=seq(100,1000,100)) +
-    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
-    theme(legend.position='right') +
-    theme(strip.switch.pad.grid = unit(10, 'cm')) +
-    ylab('Number DE genes (FDR<0.1)') +
-    xlab('Fetal Sex')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/ByWeekSigBar.png", bg="transparent", width=128, height=96, units='mm', res=227)
-p2
-dev.off()
-p2
-
-```
-
-Fold differences for all genes (this one is slow)
-```{r}
-p1 <- MalevsFemale_complete %>% 
-  dplyr::select(Id, ChrType) %>%
-  inner_join(Fold_changes, by='Id') %>%
-  PlotFC_by_ChrType("All genes CMP >= 1 in 45 or more samples")
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/AllGenesFC.png", bg="transparent", width=128, height=96, units='mm', res=227)
-p1
-dev.off()
-p1
-p2<-MalevsFemale_complete %>% 
-  dplyr::select(Id, ChrType) %>%
-  filter(ChrType != 'chrY' & Id != 'ENSG00000229807') %>% 
-  inner_join(Fold_changes, by='Id') %>%
-  PlotFC_by_ChrType("All Non Y/XIST genes")
-
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/AllNonYGenesFC.png", bg="transparent", width=128, height=96, units='mm', res=227)
-p2
-dev.off()
-p2
-```
-
-Figure 3: Expression data for selected genes characteristic of mature neurons (GABRA1, GRIN2A) and proliferating neural progenitor cells (NES, EOMES) in 14 PCW brain samples (8 male, 10 female).
-```{r}
-Week14 <- bind_rows(read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/MalevsFemale.down.txt",
-                     "\t", escape_double = FALSE, trim_ws = TRUE),
-                    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/MalevsFemale.up.txt",
-                               "\t", escape_double = FALSE, trim_ws = TRUE) )%>% 
-  dplyr::select(Id, starts_with('norm'), Female, Male) %>%
-  separate(Id, c("Id"), sep='[.]', extra='drop')
-
-makePlot <- function(letter, geneID) {
-  Ensembl_Id <- bitr(geneID, fromType="SYMBOL", toType="ENSEMBL", OrgDb="org.Hs.eg.db")[,2] %>%
-     paste(collapse = '_')
-  PlotTimepoint(geneID, filter(Week14, Id == Ensembl_Id), letter)
-}
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/Fig3.png", bg="transparent", width=210, height=140, units='mm', res=227)
-grid.arrange(makePlot('A', 'GABRA1'), makePlot('B', 'GRIN2A'), makePlot('C', 'NES'), makePlot('D', 'EOMES'), ncol=2)
-dev.off()
-grid.arrange(makePlot('A', 'GABRA1'), makePlot('B', 'GRIN2A'), makePlot('C', 'NES'), makePlot('D', 'EOMES'), ncol=2)
-```
-
-Fold changes for Gene Set genes
-```{r}
-gene_sets <- GetGeneSets()
-gene_sets <- dplyr::select(MalevsFemale_complete, ENSEMBL = Id, ChrType) %>%
-  right_join(gene_sets)
-
-Neuronal <- gene_sets %>% 
-  filter(set=='Neuronal' & gene_name != 'XIST') %>%
-  left_join(Fold_changes, by=c('ENSEMBL' = 'Id')) %>%
-  mutate(Id = ENSEMBL)
-NeuronalFC <- PlotFC(Neuronal, 'Neuronal Genes')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/Neuronal.png", bg="transparent", width=128, height=96, units='mm', res=227)
-NeuronalFC
-dev.off()
-NeuronalFC
-
-NPC <- gene_sets %>% 
-  filter(set=='NPC' & gene_name != 'RPS4Y1') %>%
-  left_join(Fold_changes, by=c('ENSEMBL' = 'Id')) %>%
-  mutate(Id = ENSEMBL)
-NPCFC <- PlotFC(NPC, 'Neural Progenitor Cell Genes')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/NPC.png", bg="transparent", width=128, height=96, units='mm', res=227)
-NPCFC
-dev.off()
-NPCFC
-
-RG <- gene_sets %>% 
-  filter(set=='RadialGlia' & gene_name != 'RPS4Y1') %>%
-  left_join(Fold_changes, by=c('ENSEMBL' = 'Id')) %>%
-  mutate(Id = ENSEMBL)
-RGFC<-PlotFC(RG, 'Radial Glia Genes')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/RadialGlia.png", bg="transparent", width=128, height=96, units='mm', res=227)
-RGFC
-dev.off()
-RGFC
-
-AN <- gene_sets %>% 
-  filter(set=='cluster7' & gene_name != 'RPS4Y1') %>%
-  left_join(Fold_changes, by=c('ENSEMBL' = 'Id')) %>%
-  mutate(Id = ENSEMBL)
-ANFC<-PlotFC(AN, 'Top 21 Adult Neuron Genes (cluster 7)')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/AdultNeuron.png", bg="transparent", width=128, height=96, units='mm', res=227)
-ANFC
-dev.off()
-ANFC
-
-FR <- gene_sets %>% 
-  filter(set=='cluster9' & gene_name != 'RPS4Y1') %>%
-  left_join(Fold_changes, by=c('ENSEMBL' = 'Id')) %>%
-  mutate(Id = ENSEMBL)
-FRFC<-PlotFC(FR, 'Top 21 Replicating Fetal Genes (cluster 9)')
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/FetalReplicating.png", bg="transparent", width=128, height=96, units='mm', res=227)
-FRFC
-dev.off()
-FRFC
-```
-
-Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
-``` {r}
-png(file="~/BTSync/FetalRNAseq/LabNotes/Results/Fig2.png", bg="transparent", width=210, 
-    height=70, units='mm', res=227)
-grid.arrange(PlotFC(AN, 'A.'), PlotFC(FR, 'B.'), ncol=2)
-dev.off()
-
-```
-
-Week 14
-```{r}
-
-disease2gene <- gene_sets[, c("set", "gene_name")] 
-
-FemaleDEG <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/FemaleUp.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-
-FemaleEnrichment <- summary(enricher(FemaleDEG$GeneID, TERM2GENE=disease2gene))
-FemaleEnrichment$Direction <- 'FemaleBiased'
-
-MaleDEG <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/MaleUp.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-
-MaleEnrichment <- summary(enricher(MaleDEG$GeneID, TERM2GENE=disease2gene))
-MaleEnrichment$Direction <- 'MaleBiased'
-Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>% 
-  separate(GeneRatio, c('x1', 'y1'), sep='/', remove=FALSE) %>% 
-  separate(BgRatio, c('x2', 'y2'), sep='/', remove=FALSE) %>%
-  mutate(Enrichment=(as.numeric(x1)/as.numeric(y1))/(as.numeric(x2)/as.numeric(y2))) %>%
-  dplyr::select(Direction, ID, GeneRatio, BgRatio, Enrichment, pvalue, p.adjust, qvalue, geneID)
-write_tsv(Enrichment, "~/BTSync/FetalRNAseq/LabNotes/Results/Enrichment14.txt")
-Enrichment
-```
-
-All Weeks
-```{r}
-disease2gene <- gene_sets[, c("set", "gene_name")] 
-
-FemaleDEG <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/FemaleUp12_19.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-
-FemaleEnrichment <- summary(enricher(FemaleDEG$GeneID, TERM2GENE=disease2gene))
-FemaleEnrichment$Direction <- 'FemaleBiased'
-
-MaleDEG <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/MaleUp12_19.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-
-MaleEnrichment <- summary(enricher(MaleDEG$GeneID, TERM2GENE=disease2gene))
-#MaleEnrichment$Direction <- 'MaleBiased'
-Enrichment <- bind_rows(FemaleEnrichment, MaleEnrichment) %>% 
-  separate(GeneRatio, c('x1', 'y1'), sep='/', remove=FALSE) %>% 
-  separate(BgRatio, c('x2', 'y2'), sep='/', remove=FALSE) %>%
-  mutate(Enrichment=(as.numeric(x1)/as.numeric(y1))/(as.numeric(x2)/as.numeric(y2))) %>%
-  dplyr::select(Direction, ID, GeneRatio, BgRatio, Enrichment, pvalue, p.adjust, qvalue, geneID)
-write_tsv(Enrichment, "~/BTSync/FetalRNAseq/LabNotes/Results/EnrichmentAll.txt")
-Enrichment
-```
-
-- Very low/negative fold-change correlation between weeks (when Y/XIST excluded)
-- For some reason, week 17-19 is correlated with everything
-- When week 14 is split into two samples, the second set is highly correlated with the full set (r=0.904), but the correlation with the first set is much weeker (r=0.675), and there are some serious outliers (one sample with log2FC=-10 for this analysis vs close to 0 for all others)
-
-
-```{r}
-Excluded <- MalevsFemale_complete %>% filter(ChrType == 'chrY' | Id == 'ENSG00000229807') %>%
-  dplyr::select(Id)
-W14_DE <-
-FC_ByWeek <- Fold_changes %>%
-  dplyr::select(-sig) %>%
-  spread(week, log2FoldChange) %>% 
-  dplyr::select(Id, 'w12'=`12`, 'w13'=`13`, 'w14'=`14`, 'w15_16'=`15.5`, 'w17_19'=`18`) %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_19043_17921_19031_17221_18015_17053_17071_18529_18856_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, w14_1= log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_17812_18282_18349_18355_18687_16428_16488_16640_16929_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  dplyr::select(Id, w14_2=log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_17812_18282_18349_17221_18015_16428_16488_18529_18856_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  dplyr::select(Id, w14_3=log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_19043_17921_19031_18355_18687_17053_17071_16640_16929_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  dplyr::select(Id, w14_4=log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  anti_join(Excluded) 
-dplyr::select(FC_ByWeek, -Id, -starts_with('w14_')) %>%
-  ggpairs()
-dplyr::select(FC_ByWeek, starts_with('w14')) %>%
-  ggpairs()
-filter(Fold_changes, week==14 & sig==1) %>% 
-  inner_join(FC_ByWeek) %>% 
-  dplyr::select(starts_with('w14')) %>% 
-  ggpairs()
-```
-
-- For some reason, the second set is getting some genes with relatively small differences between Male and Female counts, but very large fold changes
-- The fold changes are more complex estimates, so simply dividing Male by Female doesn't give the exact same numeber (and in fact I had to add 1 to deal with division by zero errors)
-- However, in the case of the second set, fold changes calculated this way correlate highely with the original estimates (r=0.903 with no major outliers)
-- The correlation is much lower in the case of the first set (r=.591, with a point at 0,-10)
-- In the case of the second set, the original FC values correlate better with the full set than the recalculated ones (r=0.904 vs. r=0.847), while in the case of set 1, the correlation is lower (r=0.675 vs. r=0.733)
-- It seems pretty clear that something went horribly wrong in the first run 
-
-```{r}
-recalculated <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_19043_17921_19031_17221_18015_17053_17071_18529_18856_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  separate(Id, c('Id'), sep = "[.]", extra='drop') %>%
-  mutate(w14_1_2 = log2((Male+1)/(Female+1))) %>%
-  dplyr::select(Id, w14_1_2) %>%
-  inner_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_17812_18282_18349_18355_18687_16428_16488_16640_16929_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  separate(Id, c('Id'), sep = "[.]", extra='drop') %>%
-  mutate(w14_2_2 = log2((Male+1)/(Female+1))) %>%
-  dplyr::select(Id, w14_2_2)
-  ) %>%
-  inner_join(FC_ByWeek)
-
-recalculated %>% dplyr::select(w14, w14_1, w14_1_2, w14_2, w14_2_2) %>%
-    ggpairs()
-
-```
-
-- The correlation with the replication set is ...not good
-- It's similar to the between-weeks values
-
-```{r}
-HDBRexpression <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBRexpression_FDR_0.1_edgeR/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% dplyr::select(Id, w14_rep=log2FoldChange) %>% separate(Id, c('Id'), sep = "[.]", extra='drop') %>%
-  inner_join(recalculated) 
-
-HDBRexpression %>% dplyr::select(w14, w14_1_2, w14_2, w14_rep) %>%
-    ggpairs()
-
-```
-
-
-```{r}
-DEseq_FC <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_DEseq/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, w14= log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop') %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_19043_17921_19031_17221_18015_17053_17071_18529_18856_FDR_0.1_DEseq/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, w14_1= log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_18282_18349_18355_18687_16428_16488_16640_16929_FDR_0.1_DEseq/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  dplyr::select(Id, w14_2=log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-    full_join(
-    read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_excl_17921_FDR_0.1_DEseq/tables/MalevsFemale.complete.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE) %>% 
-  dplyr::select(Id, w14_3=log2FoldChange) %>%
-  separate(Id, c('Id'), sep = "[.]", extra='drop')
-  ) %>%
-  anti_join(Excluded) 
-dplyr::select(DEseq_FC, -Id) %>%
-  ggpairs()
-```
-
-``` {r}
-
-IDgenes <- data.frame(SYMBOL=c('NLGN4X', 'RPS6KA3', 'ARX', 'PQBP1', 'KDM5C', 'OPHN1', 'NLGN3', 'SLC16A2', 'ATRX', 'AGTR2', 'MECP2', 'SLC6A8', 'IL1RAPL1', 'ZNF41', 'FTSJ1', 'TSPAN7', 'DLG3', 'PAK3', 'ACSL4', 'ARHGEF6', 'FMR1', 'AFF2', 'GDI1'))
-
-
-XLID <- read_csv("~/BTSync/FetalRNAseq/LabNotes/Datafiles/XLID.txt", 
-     col_names = FALSE) %>% dplyr::rename(SYMBOL=X1)
-
-XLID_all <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/BG12_19.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% right_join(XLID) 
-XLID_all %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/Results/week12_19_ID.txt")
-XLID_all_sigF <- filter(XLID_all, padj < 0.1 & log2FoldChange < 0)
-XLID_all_sigF$SYMBOL
-
-XLID_all_sigM <- filter(XLID_all, padj < 0.1 & log2FoldChange > 0)
-
-XLID_all_sigM$SYMBOL
-
-
-XLID_14 <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/BG14.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% right_join(XLID)  
-
-XLID_14 %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/Results/week14_ID.txt")
-XLID_14_sigF <- filter(XLID_14, padj < 0.1 & log2FoldChange < 0)
-XLID_14_sigF$SYMBOL
-XLID_14_sigM <- filter(XLID_14, padj < 0.1 & log2FoldChange > 0)
-XLID_14_sigM$SYMBOL
-
-```
-
-``` {r}
-XLASD <- read_csv("~/BTSync/FetalRNAseq/LabNotes/Datafiles/XLASD.txt", 
-     col_names = FALSE) %>% dplyr::rename(SYMBOL=X1)
-
-XLASD_all <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/BG12_19.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% right_join(XLASD) 
-XLASD_all %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/Results/week12_19_ASD.txt")
-XLASD_all_sigF <- filter(XLASD_all, padj < 0.1 & log2FoldChange < 0)
-XLASD_all_sigF$SYMBOL
-
-XLASD_all_sigM <- filter(XLASD_all, padj < 0.1 & log2FoldChange > 0)
-
-XLASD_all_sigM$SYMBOL
-
-
-XLASD_14 <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/BG14.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% right_join(XLASD)  
-
-XLASD_14 %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/Results/week14_ASD.txt")
-XLASD_14_sigF <- filter(XLASD_14, padj < 0.1 & log2FoldChange < 0)
-XLASD_14_sigF$SYMBOL
-XLASD_14_sigM <- filter(XLASD_14, padj < 0.1 & log2FoldChange > 0)
-XLASD_14_sigM$SYMBOL
-```
-
-``` {r}
-Xinactivation <- read_tsv("~/BTSync/FetalRNAseq/LabNotes/Datafiles/Zheng13.txt")
-
-FemaleUpX <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/FemaleUp12_19.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(Chr == 'chrX') %>% dplyr::select(SYMBOL=GeneID, FemaleUp=Chr)
-MaleUpX <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/MaleUp12_19.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(Chr == 'chrX') %>% dplyr::select(SYMBOL=GeneID, MaleUp=Chr)
-BG <- read_delim("~/BTSync/FetalRNAseq/LabNotes/Results/BG12_19.txt", 
-     "\t", escape_double = FALSE, trim_ws = TRUE) %>% dplyr::select(SYMBOL, Id)
-
-OtherStudy <- data.frame(SYMBOL =c("AKAP17A", "CD99", "stSG15779", "EIF1AX", "stSG1369", "stSG9723", "ARSD", "STS", "PNPLA4", "TBL1X", "OFD1", "TRAPPC2", "PIR", "INE2", "stSG4551", "GRPR", "RBBP7", "EIF2S3", "MED14", "USP9X", "ZNFXP", "KDM6A", "UBA1", "CDK16", "INE1", "KDM5C", "ADS56", "DXS1000E", "SMC1A", "ADS13", "AA383258", "RPS4X", "WI-12682"), Carrel=1) 
-
-
-Results <- full_join(FemaleUpX, MaleUpX) %>% 
-  full_join(Xinactivation, by=c('SYMBOL' = 'Genes')) %>%
-  full_join(OtherStudy) %>% 
-  left_join(BG) %>%
-  mutate(Expressed = ifelse(! is.na(FemaleUp), 
-                            'FemaleUp', 
-                            ifelse(! is.na(MaleUp),
-                                   'MaleUp',
-                                   ifelse(is.na(Id), 
-                                           'NotExpressed', 
-                                           'Equal'))),
-         Carrel = ifelse(is.na(Carrel), 0, 1),
-         Reported = ifelse(is.na(Reported), 'NA', Reported)) %>%
-  dplyr::select(-FemaleUp, -MaleUp)
-write_delim(Results, "~/BTSync/FetalRNAseq/LabNotes/Results/Xinactivation.txt", delim='\t')
-
-Results %>%  dplyr::select(Reported, Expressed, Carrel) %>% 
-  table()
-
-```
-
-```{r}
-my_db <- src_mysql("FetalRNAseq", host="localhost", user="root")
-geneIDs <- collect(tbl(my_db, sql("SELECT DISTINCT GencodeFeatures.value AS 'GeneID' FROM 
-GencodeFeatures, GencodeGTF WHERE 
-GencodeGTF.id = GencodeFeatures.id AND 
-GencodeFeatures.feature = 'gene_name' AND 
-GencodeFeatures.id IN (SELECT GencodeGTF.id FROM GencodeGTF, GencodeFeatures WHERE 
-                                             GencodeGTF.id = GencodeFeatures.id AND GencodeGTF.seqid = 'chrX')")))
-
-SexBiasedGenes_14PCW <- read_csv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedGenes_14PCW.csv")
-
-#bind_cols(duplicates, GetGeneIDs(paste(SexBiasedGenes_14PCW$Id, duplicates$version, sep='.')))
-
-inner_join(SexBiasedGenes_14PCW, geneIDs, by=c('x' = 'GeneID')) %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedX_14PCW.csv")
-anti_join(SexBiasedGenes_14PCW, geneIDs, by=c('x' = 'GeneID')) %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedAutosome_14PCW.csv")
-
-SexBiasedGenes_All <- read_csv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedGenes_AllSamples.csv")
-inner_join(SexBiasedGenes_All, geneIDs, by=c('x' = 'GeneID')) %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedX_All.csv")
-anti_join(SexBiasedGenes_All, geneIDs, by=c('x' = 'GeneID')) %>% write_tsv("~/BTSync/FetalRNAseq/LabNotes/DMPs/SexBiasedAutosome_All.csv")
-
-```
-
-
-```{r}
-FemaleDEG <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/MalevsFemale.down.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-FemaleDEG<-FemaleDEG %>% 
-  dplyr::select(Id, starts_with('norm')) %>%
-  gather(label, norm_count, -Id) %>%
-  mutate(label=gsub('norm.', '', label )) %>%
-  left_join(target)
-MaleDEG <- read_delim("~/BTSync/FetalRNAseq/Counts/MvsF_14_HDBR_FDR_0.1_edgeR/tables/MalevsFemale.up.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-MaleDEG<-MaleDEG %>% 
-  dplyr::select(Id, starts_with('norm')) %>%
-  gather(label, norm_count, -Id) %>%
-  mutate(label=gsub('norm.', '', label )) %>%
-  left_join(target)
-
-
-cor <- bind_rows(FemaleDEG, MaleDEG) %>% group_by(Id) %>% summarise(r=cor.test(norm_count, RIN)[[4]], p_val=cor.test(norm_count, RIN)[[3]])
-filter(cor, p_val < 0.05) %>% nrow()/nrow(cor)
-ggplot(cor, aes(x=r)) + geom_histogram() + tufte_theme()
-ggplot(cor, aes(x=p_val)) + geom_histogram() + tufte_theme()
-```
-```{r}
-null <- data.frame(Id=rep(seq(1000), 105),
-                   x=rnorm(105000),
-                   y=rnorm(105000))
-null_cor <- null %>% group_by(Id) %>% summarise(r=cor.test(x, y)[[4]], p_val=cor.test(x, y)[[3]])
-
-ggplot(null_cor, aes(x=r)) + geom_histogram() + tufte_theme()
-ggplot(null_cor, aes(x=p_val)) + geom_histogram() + tufte_theme()
-
-```
