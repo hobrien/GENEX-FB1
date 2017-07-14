@@ -28,7 +28,9 @@ full_join(read_tsv("../Data/experiment.txt",
                        ), by="Sample"
           )
 
-gene_info <- read_tsv("../Data/genes.txt", col_types = cols(
+par <- read_tsv("../Data/PARgenes.txt")
+
+all_gene_info <- read_tsv("../Data/genes.txt", col_types = cols(
   seqid = col_character(),
   source = col_character(),
   feature = col_character(),
@@ -42,13 +44,10 @@ gene_info <- read_tsv("../Data/genes.txt", col_types = cols(
   gene_status = col_character(),
   gene_name = col_character()
 )) %>%
-  mutate(gene_id = sub("\\.[0-9]+", "", gene_id),
-         ChrType = ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal')
-         ) %>%
-  dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType, gene_type)
-
-par <- read_tsv("../Data/PARgenes.txt")
-gene_info <- mutate(gene_info, ChrType=ifelse(SYMBOL %in% par$`Approved Symbol`, 'PAR', ChrType))
+  mutate(Id = sub("\\.[0-9]+", "", gene_id),
+         ChrType = ifelse(gene_name %in% par$`Approved Symbol`, 'PAR', ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal'))
+         )
+gene_info <- all_gene_info %>% dplyr::select(Id, SYMBOL=gene_name, Chr=seqid, ChrType, gene_type)
 
 MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
   mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
@@ -597,3 +596,36 @@ grid.arrange(p1, p2, ncol=2)
 ```
 
 
+- "Escape genes may be especially important in brain function and this could lead to sex differences (Xu and Disteche 2006). About 10% of X-linked genes but only 3% of auto-somal genes cause intellectual disability when mutated (Ropers 2008; Ropers and Hamel 2005; Zechner et al. 2001). This makes the X chromosome an attractive target for study with regard to brain development and function. This pro-brain characteristic of X-linked genes seems to be especially pronounced among X escape genes. Despite fewer escape genes in mouse than human (Berletch et al. 2010; Lopes et al. 2010; Yang et al. 2010), the majority of the mouse escape genes identified thus far play a role in brain development and are conserved in human where they have been implicated in intellectual disability syndromes (Ropers 2010)." (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3136209/)
+```{r}
+#library("ggbio")
+library(grid)
+library(png)
+load(system.file("data", "hg19IdeogramCyto.rda", package="biovizBase", mustWork=TRUE))
+
+#png("../Figures/chrX.png", bg='transparent')
+#plotIdeogram(hg19IdeogramCyto, "chrX")
+#dev.off()
+img <- readPNG("../Figures/chrX.png")
+g <- rasterGrob(img, interpolate=TRUE)
+
+ChrXgenes<-mutate(all_gene_info, pos=start+(end-start)/2) %>% 
+  right_join(filter(DESeqfit, Chr=='chrX' & ageBin=='12-19')) %>%
+  mutate(sig=ifelse(padj>.1 | is.na(padj), '!DE', 'DE'))
+ggplot(ChrXgenes, aes(x=pos, y=log2FoldChange, colour=ChrType, shape=factor(sig))) +
+  annotation_custom(g, xmin = 0, xmax = 156040895 , ymin = .5,
+  ymax = Inf) +
+  geom_point(alpha=.25) + 
+  geom_point(alpha=1, data=filter(ChrXgenes, sig=='DE')) +
+  geom_text(aes(label=SYMBOL, x=pos+1000000), data=filter(ChrXgenes, sig=='DE'), hjust=0, check_overlap = TRUE) +
+  main_theme() +
+  scale_colour_brewer(type = "qual", palette = 6) +
+  scale_y_continuous(limits=c(-2.5,1.2)) +
+  ylab("<--- Female-biased        Male-biased --->") +
+  xlab("") +
+  ggtitle("Log2 fold Bias along chrX") +
+  theme(legend.position='right') +
+  theme(axis.title.y = element_text(size=10)) +
+  theme(plot.background=element_blank())
+
+```
