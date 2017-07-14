@@ -121,81 +121,75 @@ shinyServer(function(input, output) {
   PCW15_16 = filter(fitted, ageBin=='15-16' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
   PCW17_19 = filter(fitted, ageBin=='17-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
   
+  filter_table <- function(fitted, ChrTypeList, Bias, p_type, p_val) {
+    fitted <- filter(fitted, UQ(as.name(p_type)) < p_val ) %>%
+      arrange(UQ(as.name(p_type))) %>%
+      filter(ChrType %in% ChrTypeList) %>% 
+      select(-ChrType)
+    if (Bias == 'MaleUp') {
+      fitted <- fitted %>% filter(log2FoldDiff > 0)
+    } else if (Bias == 'FemaleUp') {
+      fitted <- fitted %>% filter(log2FoldDiff < 0)
+    }  
+    fitted
+  }
   output$mytable1 <- DT::renderDataTable({
-    all_PCW_filtered <- all_PCW %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(all_PCW_filtered[all_PCW_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$mytable2 <- DT::renderDataTable({
-    PCW12_filtered <- PCW12 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(PCW12_filtered[PCW12_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$mytable3 <- DT::renderDataTable({
-    PCW13_filtered <- PCW13 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(PCW13_filtered[PCW13_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$mytable4 <- DT::renderDataTable({
-    PCW14_filtered <- PCW14 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(PCW14_filtered[PCW14_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$mytable5 <- DT::renderDataTable({
-    PCW15_16_filtered <- PCW15_16 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(PCW15_16_filtered[PCW15_16_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$mytable6 <- DT::renderDataTable({
-    PCW17_19_filtered <- PCW17_19 %>% filter(ChrType %in% input$ChrType) %>% select(-ChrType)
-    DT::datatable(PCW17_19_filtered[PCW17_19_filtered[, input$p_type] < input$pvalue, ])
+    DT::datatable(filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue))
   })
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
     content = function(file) {
-      arrange_(all_PCW[all_PCW[, input$p_type] < input$pvalue, ], input$p_type) %>%
-        filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
   )
   output$download12 <- downloadHandler(
     filename = function() { 'PCW12.txt' },
     content = function(file) {
-      arrange_(PCW12[PCW12[, input$p_type] < input$pvalue, ], input$p_type) %>%
-      filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )
   output$download13 <- downloadHandler(
     filename = function() { 'PCW13.txt' },
     content = function(file) {
-      arrange_(PCW13[PCW13[, input$p_type] < input$pvalue, ], input$p_type) %>%
-      filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )
   output$download14 <- downloadHandler(
     filename = function() { 'PCW14.txt' },
     content = function(file) {
-      arrange_(PCW14[PCW14[, input$p_type] < input$pvalue, ], input$p_type) %>%
-      filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )
   output$download15_16 <- downloadHandler(
     filename = function() { 'PCW15_16.txt' },
     content = function(file) {
-      arrange_(PCW15_16[PCW15_16[, input$p_type] < input$pvalue, ], input$p_type) %>%
-      filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )
   output$download17_19 <- downloadHandler(
     filename = function() { 'PCW17_19.txt' },
     content = function(file) {
-      arrange_(PCW17_19[PCW17_19[, input$p_type] < input$pvalue, ], input$p_type) %>%
-      filter(ChrType %in% input$ChrType) %>% 
-        select(-ChrType) %>%
+      filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )

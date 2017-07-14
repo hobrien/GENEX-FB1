@@ -32,6 +32,8 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
            tabPanel("Table",
                      sidebarLayout(
                        sidebarPanel(
+                         radioButtons("Bias", "Bias Direction", c('Male Bias'='MaleUp', 'Female Bias'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
+                                      width = NULL),
                          checkboxGroupInput("ChrType", "Chromosome types", 
                                             choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
                                             inline = FALSE, width = NULL),
