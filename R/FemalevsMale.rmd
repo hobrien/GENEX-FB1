@@ -357,6 +357,7 @@ mutate(DESeq_vs_EdgeR, DESeq_filtering=ifelse(is.na(DESeq_padj), 'not tested', '
 
 # Gene Types
 - Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
+- Protein coding genes tend to have much more reads than lincRNAs
 - PC genes and lincRNAs make up 54% and 12% of background genes, respectively
 - The Y also has a lot of DE pseudogenes
 
@@ -388,6 +389,15 @@ BG %>%
   group_by(gene_type) %>%
   summarise(background=n()/dim(BG)[1]) %>%
   arrange(desc(background))
+
+ggplot(filter(BG, Chr != 'chrX' & Chr != 'chrY'), aes(x=gene_type, y=baseMean)) +
+  geom_jitter(alpha=.1) + 
+  geom_jitter(alpha=1, colour='red', data=filter(BG, padj < .1 & Chr != 'chrX' & Chr != 'chrY')) +
+  scale_y_log10() + 
+  figure_theme() +
+  theme(axis.text.x=element_text(angle=90, hjust = 1)) +
+  ggtitle("Expression levels of autosomal genes in full daatset (red=FDR<0.1)") +
+  xlab('')
 
 ggplot(sigGenesDESeq, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
   facet_grid(ChrType ~ ageBin) +
