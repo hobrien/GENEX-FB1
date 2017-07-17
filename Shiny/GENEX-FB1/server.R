@@ -130,26 +130,28 @@ shinyServer(function(input, output) {
       fitted <- fitted %>% filter(log2FoldDiff > 0)
     } else if (Bias == 'FemaleUp') {
       fitted <- fitted %>% filter(log2FoldDiff < 0)
-    }  
+    }
+    fitted <- mutate(fitted, SYMBOL=paste0("<a href=https://gtexportal.org/home/gene/", Id, ">", SYMBOL, "</a>"),
+                     Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, ">", Id, "</a>"))
     fitted
   }
   output$mytable1 <- DT::renderDataTable({
-    DT::datatable(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$mytable2 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$mytable3 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$mytable4 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$mytable5 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$mytable6 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue))
+    DT::datatable(filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
