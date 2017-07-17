@@ -102,9 +102,11 @@ PlotSampleSize<-function(target, ages){
 shinyServer(function(input, output) {
    
   output$distPlot <- renderPlot({
+    req(input$geneID)
     PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
   })
   output$timeCourse <- renderPlot({
+    req(input$geneID)
     PlotExpression(toupper(input$geneID), counts, target, input$ages)
   })
   output$sampleSizeHist <- renderPlot({
