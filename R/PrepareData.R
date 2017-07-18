@@ -64,7 +64,15 @@ fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt
       mutate(ageBin='17-19')
   )
 
-right_join(gene_info, fittedBias) %>% View()
+right_join(gene_info, fittedBias) %>% 
   write_tsv("Shiny/GENEX-FB1/Data/fitted.txt")
 
+fittedPCW <- read_tsv("Results/PCW_Sex_12_20_FDR_0.1_DESeqLRT/tables/dropPCW.complete.txt") %>%
+  select(Id, baseMean, log2FoldChange, pvalue, padj) %>%
+  mutate(Id = sub("\\.[0-9]+", "", Id))
+
+right_join(gene_info, fittedPCW) %>% 
+  write_tsv("Shiny/GENEX-FB1/Data/dropPCW.complete.txt")
+
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
+

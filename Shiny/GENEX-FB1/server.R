@@ -24,7 +24,12 @@ fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws =
   dplyr::rename(log2FoldDiff = log2FoldChange)
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
-PlotExpression<-function(geneID, counts, target, ages) {
+fittedPCW <- read_delim("./Data/dropPCW.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2)))
+
+target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
+
+PlotExpression<-function(geneID, counts, fittedPCW, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
   ageSplit <- strsplit(ages, '-')[[1]]
   min <- ageSplit[1]
@@ -36,13 +41,18 @@ PlotExpression<-function(geneID, counts, target, ages) {
     dplyr::select(Sample, value) %>%
     left_join(target) %>%
     filter(PCW >= min & PCW <= max)
+  fit_params <- filter(fittedPCW, SYMBOL == geneID | Id == geneID) 
+  mean_age<-mean(target$PCW)
+  fit <- data.frame(PCW=seq(12,19)) %>%  mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldChange*(PCW-mean_age)))
+  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldChange, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
-    geom_smooth() +
+    geom_line(aes(y=fit), colour='black', data=fit) +
     ylab("normalised counts") +
     xlab('') +
     main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) 
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(title) 
   plot
 }
 
@@ -100,14 +110,13 @@ PlotSampleSize<-function(target, ages){
 }
 
 shinyServer(function(input, output) {
-   
   output$distPlot <- renderPlot({
     req(input$geneID)
     PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
   })
   output$timeCourse <- renderPlot({
     req(input$geneID)
-    PlotExpression(toupper(input$geneID), counts, target, input$ages)
+    PlotExpression(toupper(input$geneID), counts, fittedPCW, target, input$ages)
   })
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)
