@@ -258,6 +258,7 @@ if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
   downfile=paste0("tables/FemaleUp", ageBin, ".txt")
   col_names <- c('Id', 'baseMean', 'Male', 'Female', 'FC', 'log2FoldChange', 'pvalue', 'padj')
+  
 } else {
   upfile=paste0("tables/Upregulated", ageBin, ".txt")
   downfile=paste0("tables/Downregulated", ageBin, ".txt")
@@ -282,9 +283,12 @@ right_join(gene_info, Downregulated) %>%
 Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE) 
 if (opt$tool == 'EdgeR') {
     Complete <- Complete %>% filter(! is.na(log2FoldChange))
-} else{
+} else if ( testMethod=='Wald' ){
     Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$Male_vs_Female)$filterThreshold)
-}
+} else {
+  Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$drop_PCW)$filterThreshold)
+} 
+  
 Complete <- Complete %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
   dplyr::select(one_of(col_names))
 
