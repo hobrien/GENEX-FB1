@@ -13,7 +13,7 @@ library(shiny)
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
 
 navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
-           tabPanel("Sex Diffs",
+           tabPanel("Plots",
                     sidebarLayout(
                       sidebarPanel(
                         textInput("geneID", "Gene symbol or Ensembl ID"),
@@ -29,7 +29,7 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                       )
                     )
            ),
-           tabPanel("Table",
+           tabPanel("Sex Diffs",
                      sidebarLayout(
                        sidebarPanel(
                          radioButtons("Bias", "Bias Direction", c('Male Bias'='MaleUp', 'Female Bias'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
@@ -80,5 +80,30 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                          )
                        )
                      )
-            )
+            ),
+           tabPanel("Development",
+                    sidebarLayout(
+                      sidebarPanel(
+                        radioButtons("Direction", "Change with time", c('Upregulated'='MaleUp', 'Downregulated'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
+                                     width = NULL),
+                        checkboxGroupInput("ChrTypePCW", "Chromosome types", 
+                                           choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
+                                           inline = FALSE, width = NULL),
+                        radioButtons("p_typePCW", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,
+                                     width = NULL),
+                        sliderInput("pvaluePCW", "p-value:", 
+                                    min = 0, max = 1, value = 0.1, step= 0.01),
+                        textInput("typedPvalPCW", "Type p-value", value=.1),
+                        downloadButton('downloadPCW', 'Download')
+       
+                        
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          id = 'dataset',
+                          tabPanel('Expression shifts over development', DT::dataTableOutput('mytable7'))
+                        )
+                      )
+                    )
+           )           
 )

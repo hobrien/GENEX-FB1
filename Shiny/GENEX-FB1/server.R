@@ -25,7 +25,8 @@ fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws =
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
 fittedPCW <- read_delim("./Data/dropPCW.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2)))
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange)
 
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
@@ -43,8 +44,8 @@ PlotExpression<-function(geneID, counts, fittedPCW, target, ages) {
     filter(PCW >= min & PCW <= max)
   fit_params <- filter(fittedPCW, SYMBOL == geneID | Id == geneID) 
   mean_age<-mean(target$PCW)
-  fit <- data.frame(PCW=seq(12,19)) %>%  mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldChange*(PCW-mean_age)))
-  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldChange, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
+  fit <- data.frame(PCW=seq(12,19)) %>%  mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
+  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
     geom_line(aes(y=fit), colour='black', data=fit) +
@@ -112,6 +113,7 @@ PlotSampleSize<-function(target, ages){
 shinyServer(function(session, input, output) {
   observe({
     updateSliderInput(session, "pvalue", value = input$typedPval)
+    updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
   output$distPlot <- renderPlot({
     req(input$geneID)
@@ -167,6 +169,9 @@ shinyServer(function(session, input, output) {
   output$mytable6 <- DT::renderDataTable({
     DT::datatable(filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue), escape = FALSE)
   })
+  output$mytable7 <- DT::renderDataTable({
+    DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), escape = FALSE)
+  })
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
     content = function(file) {
@@ -206,6 +211,13 @@ shinyServer(function(session, input, output) {
     filename = function() { 'PCW17_19.txt' },
     content = function(file) {
       filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
+        write_tsv(file)
+    }
+  )
+  output$downloadPCW <- downloadHandler(
+    filename = function() { 'PCWdiffs.txt' },
+    content = function(file) {
+      filter_table(fittedPCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }
   )
