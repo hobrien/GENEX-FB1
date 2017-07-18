@@ -41,6 +41,7 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                                       width = NULL),
                          sliderInput("pvalue", "p-value:", 
                                      min = 0, max = 1, value = 0.1, step= 0.01),
+                         textInput("typedPval", "Type p-value", value=.1),
                          conditionalPanel(
                            'input.dataset === "12-19 PCW"',
                            downloadButton('download12_19', 'Download')

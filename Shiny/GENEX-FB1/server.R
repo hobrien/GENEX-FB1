@@ -109,7 +109,10 @@ PlotSampleSize<-function(target, ages){
   plot
 }
 
-shinyServer(function(input, output) {
+shinyServer(function(session, input, output) {
+  observe({
+    updateSliderInput(session, "pvalue", value = input$typedPval)
+  })
   output$distPlot <- renderPlot({
     req(input$geneID)
     PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
