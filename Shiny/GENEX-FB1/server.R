@@ -220,7 +220,7 @@ shinyServer(function(session, input, output) {
   output$downloadPCW <- downloadHandler(
     filename = function() { 'PCWdiffs.txt' },
     content = function(file) {
-      filter_table(fittedPCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
+      filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>%
         write_tsv(file)
     }
   )
