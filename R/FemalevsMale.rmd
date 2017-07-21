@@ -306,9 +306,35 @@ ggplot(sigGenes, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'c
 ```
 - p-values are generally lower with DESeq then they are with EdgeR
 - A lot of genes that are DE with DESeq were not tested with EdgeR because the counts are low
-- A lor of the genes that are DE with EdgeR were thrown out by DESeq because of high maxCooks scores
+- A lot of the genes that are DE with EdgeR were thrown out by DESeq because of high maxCooks scores
 
 ```{r}
+
+DESeqCooks <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", col_names=TRUE, col_types = cols_only(Id='c', maxCooks='n')) %>%
+  mutate(ageBin='12-19')
+
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  DESeqCooks <- read_tsv(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt"), col_names=TRUE, col_types = cols_only(Id='c', maxCooks='n')) %>%
+  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(DESeqCooks)
+}
+
+DESeqCooks <- DESeqCooks %>%  mutate(Id = sub("\\.[0-9]+", "", Id), analysis=paste0(Id, ageBin))
+DESeq_vs_EdgeR <- group_by(sigGenes, analysis) %>%
+  summarise(n=n()) %>%
+  left_join(DESeqfit, by='analysis') %>% 
+  select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
+  left_join(select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
+  left_join(select(DESeqCooks, analysis, maxCooks), by='analysis')
+
+mutate(DESeq_vs_EdgeR, EdgeR_filtering=ifelse(is.na(EdgeR_padj), 'not tested', 'tested')) %>%
+  group_by(EdgeR_filtering) %>% 
+  summarise(n=n(), mean_Expression=mean(baseMean))
+
+mutate(DESeq_vs_EdgeR, DESeq_filtering=ifelse(is.na(DESeq_padj), 'not tested', 'tested')) %>%
+  group_by(DESeq_filtering) %>% 
+  summarise(n=n(), mean_maxCooks=mean(maxCooks))
+
 ggplot(DESeq_vs_EdgeR, aes(x=DESeq_pvalue, y=EdgeR_pvalue, colour=ageBin)) + 
     geom_point() +
     geom_abline(slope=1, intercept=0) +
@@ -326,31 +352,6 @@ ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_po
     #ylab('Sex Chromosomes Excluded') +
     ggtitle('FDR corrected p-values') +
     theme(legend.position = 'right')
-
-DESeqCooks <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", col_types = cols(.default = col_character())) %>%
-  select(Id, maxCooks) %>%
-  mutate(ageBin='12-19')
-for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
-  DESeqCooks <- read_tsv(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt"), col_types = cols(.default = col_character())) %>%
-  select(Id, maxCooks) %>%
-  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
-    bind_rows(DESeqCooks)
-}
-DESeqCooks <- DESeqCooks %>%  mutate(Id = sub("\\.[0-9]+", "", Id), analysis=paste0(Id, ageBin))
-DESeq_vs_EdgeR <- group_by(sigGenes, analysis) %>%
-  summarise(n=n()) %>%
-  left_join(DESeqfit, by='analysis') %>% 
-  select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
-  left_join(select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
-  left_join(select(DESeqCooks, analysis, maxCooks), by='analysis')
-
-mutate(DESeq_vs_EdgeR, EdgeR_filtering=ifelse(is.na(EdgeR_padj), 'not tested', 'tested')) %>%
-  group_by(EdgeR_filtering) %>% 
-  summarise(n=n(), mean_Expression=mean(baseMean))
-
-mutate(DESeq_vs_EdgeR, DESeq_filtering=ifelse(is.na(DESeq_padj), 'not tested', 'tested')) %>%
-  group_by(DESeq_filtering) %>% 
-  summarise(n=n(), mean_maxCooks=mean(maxCooks))
 
 ```
 
