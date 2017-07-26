@@ -141,7 +141,7 @@ shinyServer(function(session, input, output) {
     fitted <- filter(fitted, UQ(as.name(p_type)) < p_val ) %>%
       arrange(UQ(as.name(p_type))) %>%
       filter(ChrType %in% ChrTypeList) %>% 
-      select(-ChrType)
+      dplyr::select(-ChrType)
     if (Bias == 'MaleUp') {
       fitted <- fitted %>% filter(log2FoldDiff > 0)
     } else if (Bias == 'FemaleUp') {
@@ -151,8 +151,10 @@ shinyServer(function(session, input, output) {
   }
   
   add_links <-function(fitted) {
-    mutate(fitted, SYMBOL=paste0("<a href=https://gtexportal.org/home/gene/", Id, ">", SYMBOL, "</a>"),
-                     Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, ">", Id, "</a>"))
+    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, ">", SYMBOL, "</a>"),
+           GTEx=paste0("<a href=https://gtexportal.org/home/gene/", Id, ">GTEx</a>"),
+           Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, ">", Id, "</a>")
+           )         
   }
   output$mytable1 <- DT::renderDataTable({
     DT::datatable(add_links(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE)
