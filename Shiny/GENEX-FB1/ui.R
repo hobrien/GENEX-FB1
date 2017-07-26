@@ -81,7 +81,7 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                        )
                      )
             ),
-           tabPanel("Development",
+           tabPanel("Expression trajectory",
                     sidebarLayout(
                       sidebarPanel(
                         radioButtons("Direction", "Change with time", c('Upregulated'='MaleUp', 'Downregulated'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
