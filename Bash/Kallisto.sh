@@ -3,14 +3,19 @@
 #$ -cwd
 #$ -j y
 #$ -S /bin/bash
-#$ -l h_vmem=12G
+#$ -l h_vmem=6G
 #
 
-filename=${1##*/}
-filename=${filename%%.bam}
-sampleID=${filename%%.*}
+export PATH=$PATH:/share/apps/
 
-export PATH=$PATH:/share/apps/R-3.2.2/bin:/share/apps/
+BrainBankID=$1
+
+echo "Starting Kallisto pipeline for $BrainBankID"
+
+seq_folders=$(grep $BrainBankID Data/sequences.txt | cut -f 5 | sort | uniq)
+sequences=$(for name in `grep $BrainBankID Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
+set -- $sequences
+
 
 REFDIR=/c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy
 
@@ -51,7 +56,7 @@ fi
 
 if [ ! -f Kallisto/$SampleID/abundances.h5 ] | [ ! -f Kallisto/$SampleID/abundances.tsv ] | [ ! -f Kallisto/$SampleID/run_info.json ]
 then
-    echo "Running Kallisto on $SampleID"
+    echo "Running Kallisto on $BrainBankID"
     kallisto quant -i $REFDIR/Annotation/Genes.gencode/kallisto.inx \
       -o Kallisto/$SampleID \
       --bias \
@@ -60,9 +65,12 @@ then
       $@
     if [ $? -eq 0 ]
     then
-        echo "Finished running Kallisto on $SampleID"
+        echo "Finished running Kallisto on $BrainBankID"
     else
-        echo "Could not run Kallisto on $SampleID"
+        echo "Could not run Kallisto on $BrainBankID"
         exit 1
     fi    
 fi
+
+echo "Finished Kallisto pipeline for $BrainBankID"
+
