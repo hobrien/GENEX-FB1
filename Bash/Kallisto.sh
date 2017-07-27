@@ -13,7 +13,7 @@ BrainBankID=$1
 echo "Starting Kallisto pipeline for $BrainBankID"
 
 seq_folders=$(grep $BrainBankID Data/sequences.txt | cut -f 5 | sort | uniq)
-sequences=$(for name in `grep $BrainBankID Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
+sequences=$(for name in `grep $BrainBankID Data/sequences.txt | cut -f 1`; do find $seq_folders -name $name*f*q.gz; done)
 set -- $sequences
 
 
@@ -56,18 +56,18 @@ fi
 
 if [ ! -f Kallisto/$SampleID/abundances.h5 ] | [ ! -f Kallisto/$SampleID/abundances.tsv ] | [ ! -f Kallisto/$SampleID/run_info.json ]
 then
-    echo "Running Kallisto on $BrainBankID"
+    echo "Running Kallisto on $sequences"
     kallisto quant -i $REFDIR/Annotation/Genes.gencode/kallisto.inx \
-      -o Kallisto/$SampleID \
+      -o Kallisto/$BrainBankID \
       --bias \
       -b 100 \
       --rf-stranded \
-      $@
+      $sequences
     if [ $? -eq 0 ]
     then
-        echo "Finished running Kallisto on $BrainBankID"
+        echo "Finished running Kallisto on $sequences"
     else
-        echo "Could not run Kallisto on $BrainBankID"
+        echo "Could not run Kallisto on $sequences"
         exit 1
     fi    
 fi
