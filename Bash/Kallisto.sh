@@ -13,7 +13,7 @@ BrainBankID=$1
 echo "Starting Kallisto pipeline for $BrainBankID"
 
 seq_folders=$(grep $BrainBankID Data/sequences.txt | cut -f 5 | sort | uniq)
-sequences=$(for name in `grep $BrainBankID Data/sequences.txt | cut -f 1`; do find $seq_folders -name $name*f*q.gz; done)
+sequences=$(for name in `grep $BrainBankID Data/sequences.txt | cut -f 1`; do find $seq_folders -name $name*f*q.gz -o -name $name*f*q; done)
 set -- $sequences
 
 

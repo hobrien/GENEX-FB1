@@ -15,7 +15,7 @@ SampleID=$1
 echo "Starting mapping for $SampleID"
 
 seq_folder=$(grep -P "\s$SampleID(\s|$)" $BASEDIR/Data/sequences.txt | cut -f 5 | head -1)
-sequences=$(for name in `grep -P "\s$SampleID(\s|$)" $BASEDIR/Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz; done)
+sequences=$(for name in `grep -P "\s$SampleID(\s|$)" $BASEDIR/Data/sequences.txt | cut -f 1`; do find $seq_folder -name $name*f*q.gz -o -name $name*f*q; done)
 set -- $sequences
 
 file1=${1##*/}
