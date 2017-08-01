@@ -4,7 +4,7 @@ To run mapping on all samples:
 ```
 mkdir Mappings
 mkdir FastQC
-for sample in `cut -f2 Data/sequences.txt | sort | uniq | grep 12116`
+for sample in `cut -f2 Data/sequences.txt | sort | uniq`
 do
     bash Bash/MappingPipeline.sh $sample
 done
@@ -36,6 +36,30 @@ To Run JunctionSeq:
 mkdir JunctionSeq
 find Mappings/ -name *.sort.bam | grep -v chr | sort | xargs -n 1 qsub Bash/QoRTs.sh
 echo -e 'unique.ID\tsample.ID' > JunctionSeq/decoder.byUID.txt
-cut -f 2 Data/sequences.txt | grep '-' | sort | uniq | perl -pe 's/([^-]+)(.*)/$1$2\t$1/' >> JunctionSeq/decoder.byUID.txt 
+ls Mappings | grep '-' | perl -pe 's/([^-]+)(.*)/$1$2\t$1/' >> JunctionSeq/decoder.byUID.txt 
 qsub Bash/MergeQoRTs.sh JunctionSeq
+
+echo -e 'sample.ID' > JunctionSeq/decoder.bySample.txt
+cut -f 1 Data/SampleInfo.txt | tail -n +2 >> JunctionSeq/decoder.bySample.txt
 ```
+
+To Run JunctionSeq on 16 PCW13 samples (using GTF filtered to >= 1 TPM in at least 56 samples)
+```
+cat /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.gtf | python Python/FilterGTF.py 1 > Data/
+genesFiltered1.gtf
+mkdir JunctionSeqF1
+for BrainBankID in `grep '\b13\b' Data/SampleInfo.txt |head -16 | cut -f 1`; do find Mappings/ -name $BrainBankID*.sort.bam | grep -v chr | sort | xargs -n 1 qsub Bash/QoRTs.sh; done 
+```
+
+
+To Run DEXSeq:
+```
+mkdir DEXSeq
+find Mappings/ -name *.sort.bam | grep -v chr | sort | xargs -n 1 qsub Bash/dexseq-count.sh
+```
+
+To run Kallisto on all samples (combine all reads from each sample):
+```
+mkdir Kallisto
+cut -f 1 Data/SampleInfo.txt | tail -n +2 | xargs -n 1 qsub Bash/Kallisto.sh 
+``` 
