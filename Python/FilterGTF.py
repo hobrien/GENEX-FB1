@@ -1,24 +1,26 @@
 #!/usr/bin/env python
 
 import sys
-import subprocess
 import fileinput
 import warnings
-from string import maketrans
+import pandas as pd
 
 """
 Parse GTF from Tophat and add to DB
 """ 
 
-def main(sys.argv):
-  TPM_cutoff = sys.argv[0]
+def main(argv):
+  TPM_cutoff = float(argv[0])
   min_samples = 56 # Number of male samples in dataset
   infilename = "Counts/AllKallisto.txt"
-  counts = pd.DataFrame.from_csv(infilename, sep='\t', index_col=False)
-  includedFeatures =counts[counts[counts>=TPM_cutoff].count(axis=1) >= min_samples]['Id'].tolist()
+  counts = pd.DataFrame.from_csv(infilename, sep='\t')
+  includedFeatures =set(counts[counts[counts>=TPM_cutoff].count(axis=1) >= min_samples].index.values)
   
-  for line in fileinput.input(sys.argv[1:]):
+  for line in fileinput.input(argv[1:]):
        line = line.strip()
+       if line[0] == '#':
+           print line
+           continue
        try:
            parsed = parse_GTF(line.split('\t'))
        except IndexError:
