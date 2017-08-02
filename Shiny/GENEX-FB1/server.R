@@ -216,9 +216,9 @@ shinyServer(function(session, input, output) {
   }
   
   add_links <-function(fitted) {
-    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, ">", SYMBOL, "</a>"),
-           GTEx=paste0("<a href=https://gtexportal.org/home/gene/", Id, ">GTEx</a>"),
-           Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, ">", Id, "</a>")
+    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
+           GTEx=paste0("<a href=https://gtexportal.org/home/gene/", Id, " target='_blank'>GTEx</a>"),
+           Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, " target='_blank'>", Id, "</a>")
            )         
   }
   output$mytable1 <- DT::renderDataTable({
