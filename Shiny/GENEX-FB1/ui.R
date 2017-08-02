@@ -8,6 +8,7 @@
 #
 
 library(shiny)
+library(shinyBS)
 
 # Application title
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
@@ -104,7 +105,7 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                        )
                      )
             ),
-           tabPanel("Expression trajectory",
+           tabPanel("Expression Trajectory",
                     sidebarLayout(
                       sidebarPanel(
                         radioButtons("Direction", "Change with time", c('Upregulated'='MaleUp', 'Downregulated'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
@@ -117,6 +118,9 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                         sliderInput("pvaluePCW", "p-value:", 
                                     min = 0, max = 1, value = 0.1, step= 0.01),
                         textInput("typedPvalPCW", "Type p-value", value=.1),
+                        HTML("<strong>Plot Expression Trajectory</strong><br>"),
+                        actionButton("go", "Plot"),
+                        HTML("<br><br><strong>Export Table</strong><br>"),
                         downloadButton('downloadPCW', 'Download')
        
                         
@@ -124,7 +128,10 @@ navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
                       mainPanel(
                         tabsetPanel(
                           id = 'dataset',
-                          tabPanel('Expression shifts over development', DT::dataTableOutput('mytable7'))
+                          tabPanel('Expression shifts over development', DT::dataTableOutput('mytable7'),
+                          #plotOutput("timeCourseRowNum"),
+                          bsModal("timeCoursePlot", "Expression Trajectory", "go", size = "large",plotOutput("timeCourseRowNum"))
+                          )
                         )
                       )
                     )

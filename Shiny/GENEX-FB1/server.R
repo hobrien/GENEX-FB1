@@ -57,6 +57,29 @@ PlotExpression<-function(geneID, counts, fittedPCW, target, ages) {
   plot
 }
 
+PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
+  fit_params <- fittedPCW[row_num,]
+  geneID <- fit_params$SYMBOL
+  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(target)
+  mean_age<-mean(target$PCW)
+  fit <- data.frame(PCW=seq(12,19)) %>% mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
+  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
+  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
+    geom_jitter(height = 0, width=.1, alpha=.75) + 
+    geom_line(aes(y=fit), colour='black', data=fit) +
+    ylab("normalised counts") +
+    xlab('post-conception weeks') +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(title) 
+  plot
+}
+
 PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
   geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
   ageSplit <- strsplit(ages, '-')[[1]]
@@ -178,6 +201,12 @@ shinyServer(function(session, input, output) {
   output$timeCourse <- renderPlot({
     req(input$geneID)
     PlotExpression(toupper(input$geneID), counts, fittedPCW, target, input$ages)
+  })
+  output$timeCourseRowNum <- renderPlot({
+    validate(
+      need(input$mytable7_rows_selected != "", "Please select a row from the table")
+    )
+    PlotExpressionRowNum(input$mytable7_rows_selected, counts, filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
   })
   output$sampleSizeHist12_19 <- renderPlot({
     PlotSampleSize(target, '12-19')
