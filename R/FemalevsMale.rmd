@@ -16,7 +16,8 @@ library(stringr)
 #library(matrixStats)
 library(ggbiplot)
 library(stringr)
-library(genefilter) 
+library(genefilter)
+library(biomaRt)
 #setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
@@ -68,7 +69,7 @@ for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
 DESeqfit <- DESeqfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
          Method='DESeq',
          analysis=paste0(Id, ageBin)) %>%
-  left_join(select(gene_info, Id, ChrType), by='Id')
+  left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
 sigGenesDESeq <- DESeqfit %>% filter(padj < .1 )
 
 EdgeRfit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
@@ -83,14 +84,14 @@ for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
 EdgeRfit <- EdgeRfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
          Method='EdgeRfit',
          analysis=paste0(Id, ageBin)) %>%
- left_join(select(gene_info, Id, ChrType), by='Id')
+ left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
 
 sigGenesEdgeR <- EdgeRfit %>% filter(padj < .1 )
 
-sigGenes <- semi_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis') %>% 
+sigGenes <- semi_join(sigGenesEdgeR, dplyr::select(sigGenesDESeq, analysis), by='analysis') %>% 
   mutate(Method='Both') %>%
-  bind_rows(anti_join(sigGenesEdgeR, select(sigGenesDESeq, analysis), by='analysis')) %>%
-  bind_rows(anti_join(sigGenesDESeq, select(sigGenesEdgeR, analysis), by='analysis')) %>%
+  bind_rows(anti_join(sigGenesEdgeR, dplyr::select(sigGenesDESeq, analysis), by='analysis')) %>%
+  bind_rows(anti_join(sigGenesDESeq, dplyr::select(sigGenesEdgeR, analysis), by='analysis')) %>%
   mutate(ageBin=relevel(factor(ageBin), ref='12-19'))
 
 
@@ -269,7 +270,7 @@ p1 <- count_matrix %>%
     scale_y_continuous(limits=c(0,66000), breaks=seq(0,60000,10000)) +
     scale_x_continuous(breaks=seq(12, 19, 1)) +
     xlab("Post Conception Weeks") +
-    ylab("Ensembl transcripts (66023 total)") +
+    ylab("Ensembl genes (66023 total)") +
     theme(axis.text.x=element_text(size=8)) +
     scale_colour_brewer(type = "qual", palette = 6) +
     theme(legend.position="right")
@@ -323,9 +324,9 @@ DESeqCooks <- DESeqCooks %>%  mutate(Id = sub("\\.[0-9]+", "", Id), analysis=pas
 DESeq_vs_EdgeR <- group_by(sigGenes, analysis) %>%
   summarise(n=n()) %>%
   left_join(DESeqfit, by='analysis') %>% 
-  select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
-  left_join(select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
-  left_join(select(DESeqCooks, analysis, maxCooks), by='analysis')
+  dplyr::select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
+  left_join(dplyr::select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
+  left_join(dplyr::select(DESeqCooks, analysis, maxCooks), by='analysis')
 
 mutate(DESeq_vs_EdgeR, EdgeR_filtering=ifelse(is.na(EdgeR_padj), 'not tested', 'tested')) %>%
   group_by(EdgeR_filtering) %>% 
@@ -354,7 +355,159 @@ ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_po
     theme(legend.position = 'right')
 
 ```
+# Compare DESeq2 to Sleuth
+- This is a slightly tricky comparison because DESeq2 works on gene-level counts while Sleuth works with transcript-level TPMs from Kalliso
+- Nevertheless, all DE genes should have one or more DE transcripts and DE transcripts should result in gene-level DE unless (A) the DE transcript is expressed at a low level relative to other isoforms or (B) isoform switching results in Male biased transcripts balancing out Female biased transcripts.
+- Not that if there are large differences in isoform lengths, count differences will be obscured because I'm plotting TPM which is length-normalised. Kallisto also produces estimated counts, which I could plot instead, but there are trade-offs with both approaches.
 
+- Both methods agree on Y genes.
+- Sleuth fails to pull out most PAR genes and some other X genes
+- Lists of autosomal genes are mostly orthogonal (3 in common out of 61)
+- Many autosomal genes tested only by Sleuth and some Y genes tested only by DESeq
+- Correspondance of p-values is generally poor
+- One gene in particular (SDCBP2-AS1) is highly DE according to Sleuth and not at all according to DESeq
+    - This antisense transcript has 4 isoforms that are expressed at a moderately high level in both sexes but one is expressed very highly in some intermediate-age females
+
+```{r DESeq_vs_Sleuth}
+#read in Sleuth results and merge with gene info (using BioMart)
+mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
+                         dataset = "hsapiens_gene_ensembl",
+                         host = 'ensembl.org')
+t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
+                                     "external_gene_name", "chromosome_name", "gene_biotype"), mart = mart)
+t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id,
+                     Id = ensembl_gene_id, SYMBOL = external_gene_name, Chr=chromosome_name, gene_type=gene_biotype)
+Sleuth <- read_delim("../Results/SleuthPCW_RIN.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+Sleuth <- right_join(t2g, mutate(Sleuth, target_id=str_replace(target_id, '\\.[0-9]+', ''))) %>% mutate(Chr=paste0('chr', Chr))
+
+#select the transcript for each gene with the lowest qvalue
+SleuthTopIsoform <- Sleuth %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
+
+# There is one sig transcript that is not in the latest version of BioMart and therefore doesn't have an gene Id
+SleuthSig <- (filter(SleuthTopIsoform, qval<.1 & ! is.na(Id)))
+
+# Need to join on Id, SYMBOL, Chr and gene_type because otherwise if these are added from one of the data sets, the values are NA for any genes that weren't tested for that dataset.
+# Unfortunately I've uesed different data sources for assigning SYMBOLs to the gene IDs. This means that some rows are duplicated. The group/slice/ungroup at the end takes care of this
+DESeq_vs_Sleuth <- filter(sigGenesDESeq, ageBin=='12-19') %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
+  full_join(dplyr::select(SleuthSig, Id, SYMBOL, Chr, gene_type)) %>%
+  left_join(dplyr::select(filter(DESeqfit, ageBin=='12-19'), Id, Sex, ChrType, DESeq_pvalue = pvalue, DESeq_padj = padj)) %>%
+  left_join(dplyr::select(SleuthTopIsoform, Id, Sleuth_pvalue=pval, Sleuth_padj=qval)) %>%
+  mutate(Method=ifelse(!is.na(Sleuth_padj) & Sleuth_padj < .1,
+                       ifelse(!is.na(DESeq_padj) & DESeq_padj < .1, 
+                              'Both Sig',
+                              'Sleuth Sig'),
+                       'DESeq Sig'),
+          Tested=ifelse(is.na(Sleuth_padj),
+                             'DESeq Tested',
+                             ifelse(is.na(DESeq_padj), 
+                                    'Sleuth Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        ) %>% 
+  group_by(Id) %>% slice(1) %>% ungroup() 
+
+
+ggplot(DESeq_vs_Sleuth, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ Method) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(Sleuth_padj)) , aes(x=DESeq_pvalue, y=Sleuth_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
+    #scale_y_log10() + scale_x_log10() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values (excludes SDCBP2-AS1 Sleuth p<1e-40, DESeq p>.01)') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(Sleuth_padj)), aes(x=DESeq_padj, y=Sleuth_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
+    #scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values (excludes SDCBP2-AS1 Sleuth q<1e-40, DESeq q>.1)') +
+    theme(legend.position = 'right')
+
+AllKallisto <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Counts/AllKallisto.txt", 
+                          "\t", escape_double = FALSE, trim_ws = TRUE)
+
+AllKallisto <- right_join(t2g, mutate(AllKallisto, target_id=str_replace(target_id, '\\.[0-9]+', '')))
+
+PlotTranscripts <- function(geneID, AllKallisto, Sleuth){
+    geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+    counts <- filter(AllKallisto, Id == geneID | SYMBOL == geneID) %>% 
+      dplyr::select(-Id, -SYMBOL, -Chr, -gene_type) %>% 
+      gather(Sample, TPM, -target_id) %>% 
+      left_join(LibraryInfo) %>%
+      left_join(Sleuth) %>%
+      mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
+             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+
+    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=factor(PCW))) +
+      geom_jitter(height = 0, width=.25, alpha=.75) + 
+      facet_wrap(~ target_id, ncol=10) +
+      xlab('') +
+      main_theme() +
+      theme(legend.position='bottom') +
+      scale_colour_brewer(type = "qual", palette = 6) +
+      ggtitle(paste0(filter(counts, !is.na(Id))$Id[1], ' (', filter(counts, !is.na(SYMBOL))$SYMBOL[1], ')'))
+   p
+}
+PlotTranscripts('SDCBP2-AS1', AllKallisto, Sleuth)
+
+PlotTranscriptByAge <- function(geneID, AllKallisto, Sleuth){
+    geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+    counts <- filter(AllKallisto, target_id == geneID) %>% 
+      dplyr::select(-Id, -SYMBOL, -Chr, -gene_type) %>% 
+      gather(Sample, TPM, -target_id) %>% 
+      left_join(LibraryInfo) %>%
+      left_join(Sleuth) %>%
+      mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
+             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)),
+             ageBin=ifelse(PCW>14,
+                           ifelse(PCW>16,
+                                  '17-19',
+                                  '15-16'),
+                           PCW))
+
+    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=Sex)) +
+      geom_jitter(height = 0, width=.25, alpha=.75) + 
+      facet_wrap(~ PCW, ncol=10) +
+      xlab('') +
+      main_theme() +
+      theme(legend.position='bottom') +
+      scale_colour_brewer(type = "qual", palette = 6) +
+      ggtitle(paste0(filter(counts, !is.na(Id))$Id[1], ' (', filter(counts, !is.na(SYMBOL))$SYMBOL[1], ')'))
+   p
+}
+PlotTranscriptByAge('ENST00000609745', AllKallisto, Sleuth)
+
+```
 
 # Gene Types
 - Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
@@ -430,11 +583,13 @@ for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
 AutosomesFit <- AutosomesFit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
          Method='DESeq_autosomes',
          analysis=paste0(Id, ageBin)) %>%
-  left_join(select(gene_info, Id, ChrType), by='Id')
+  left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
 sigAutosomes <- AutosomesFit %>% filter(padj < .1 )
 
 
-AutosomeExclusion <- filter(sigGenesDESeq, ChrType=='autosomal') %>% select(analysis, XYpvalue=pvalue, XYpadj=padj, ageBin) %>% left_join(select(AutosomesFit, analysis, Autosomes_pvalue=pvalue, Autosomes_padj=padj), by='analysis')
+AutosomeExclusion <- filter(sigGenesDESeq, ChrType=='autosomal') %>%
+  dplyr::select(analysis, XYpvalue=pvalue, XYpadj=padj, ageBin) %>%
+  left_join(dplyr::select(AutosomesFit, analysis, Autosomes_pvalue=pvalue, Autosomes_padj=padj), by='analysis')
 ggplot(AutosomeExclusion, aes(x=XYpvalue, y=Autosomes_pvalue, colour=ageBin)) + 
     geom_point() +
     geom_abline(slope=1, intercept=0) +
@@ -466,7 +621,7 @@ ggplot(AutosomeExclusion, aes(x=XYpadj, y=Autosomes_padj, colour=ageBin)) + geom
 
 
 all_DE_by_week <- filter(DESeqfit, padj < 0.1 & ageBin=='12-19') %>% 
-  select(Id) %>%
+  dplyr::select(Id) %>%
   left_join(DESeqfit)
 
 PlotFC_by_ChrType(all_DE_by_week, 'All DE')
@@ -484,7 +639,7 @@ all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
 
 ```{r}
 all_DE_by_week <- sigGenes %>% 
-  select(Id) %>%
+  dplyr::select(Id) %>%
   group_by(Id) %>%
   summarise(n=n()) %>% #don't actually need this info, but I want one row per Id
   left_join(DESeqfit)
@@ -565,11 +720,11 @@ PlotExpression('GDA', MalevsFemale_complete, LibraryInfo)
 
 ```{r pca}
 vst <- read_tsv('../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/counts_vst.txt')
-metadata<-data.frame(Sample = colnames(select(vst, -Id))) %>%
+metadata<-data.frame(Sample = colnames(dplyr::select(vst, -Id))) %>%
   left_join(LibraryInfo)
 
-vst$var <- rowVars(as.matrix(select(vst, -Id)))
-pca <- arrange(vst, desc(var)) %>% .[1:500,] %>% select(-Id, -var) %>% t() %>% prcomp()
+vst$var <- rowVars(as.matrix(dplyr::select(vst, -Id)))
+pca <- arrange(vst, desc(var)) %>% .[1:500,] %>% dplyr::select(-Id, -var) %>% t() %>% prcomp()
 prp <- pca$sdev^2 * 100 / sum(pca$sdev^2)
 prp <- round(prp[1:3],2)
 
