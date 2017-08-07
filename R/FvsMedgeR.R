@@ -36,7 +36,10 @@ option_list <- list(
   make_option(c("-s", "--sex_chromosomes"), action='store_true', type="logical", default=FALSE, 
               help="Exclude sex chromosomes", metavar="sex_chromosomes"),
   make_option(c("-i", "--interaction"), type="character", default="", 
-              help="Cofactors to interact with varInt", metavar = 'interact')
+              help="Cofactors to interact with varInt", metavar = 'interact'),
+  make_option(c("-f", "--feature"), type="character", default="genes", 
+              help="Type of feature to Analyse (genes, junctions, transcripts)")
+  
   
 )
 
@@ -91,7 +94,8 @@ projectName <- paste0(varInt,
        opt$tool,
        ifelse(length(exclude > 0),
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
-       ifelse(opt$sex_chromosomes, '_autosomes', '')
+       ifelse(opt$sex_chromosomes, '_autosomes', ''),
+       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature))
 )                         # name of the project
 print(paste("Saving output to", projectName))
 
@@ -147,7 +151,18 @@ library(tidyverse)
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
 )
-LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) %>%
+
+if (opt$feature == 'genes') {
+  LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) 
+} else if (opt$feature == 'junctions') {
+  LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.junctions.txt')) 
+} else if (opt$feature == 'transcripts') {
+  LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.kallisto.counts.txt')) 
+} else {
+  stop("feature type not recognised. Must be one of (genes, junctions, transcripts)")
+  
+}
+LibraryInfo <- LibraryInfo %>%
   select(Sample, Files, Sex, PCW, RIN, ReadLength, Sequencer) %>%
   mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
   arrange(Sex)
@@ -266,14 +281,26 @@ if (opt$varInt == 'Sex') {
 }
 
 Upregulated <- read.delim(paste('tables', list.files('tables', pattern = ".up.txt$") , sep= '/'), check.names=FALSE)  %>% 
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(one_of(col_names))
-right_join(gene_info, Upregulated) %>% 
+if (opt$feature == 'junctions') {
+  Upregulated <- Upregulated %>% mutate(originalId=Id) %>%
+  separate_rows(Id, sep='\\+') %>% 
+  mutate(Id= str_replace(Id, '\\..*', ''))
+} else{
+  Upregulated <- Upregulated %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
+}
+right_join(gene_info, Upregulated) %>%
     write_tsv(upfile)
   
 Downregulated <- read.delim(paste('tables', list.files('tables', pattern = ".down.txt$") , sep= '/'), check.names=FALSE)  %>% 
-    mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
     dplyr::select(one_of(col_names))
+if (opt$feature == 'junctions') {
+  Downregulated <- Downregulated %>% mutate(originalId=Id) %>%
+    separate_rows(Id, sep='\\+') %>% 
+    mutate(Id= str_replace(Id, '\\..*', ''))
+} else{
+  Downregulated <- Downregulated %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
+}
 right_join(gene_info, Downregulated) %>% 
     write_tsv(downfile)
 
@@ -289,8 +316,14 @@ if (opt$tool == 'EdgeR') {
   Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$drop_PCW)$filterThreshold)
 } 
   
-Complete <- Complete %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id)) %>%
-  dplyr::select(one_of(col_names))
+Complete <- Complete %>% dplyr::select(one_of(col_names))
+if (opt$feature == 'junctions') {
+  Complete <- Complete %>% mutate(originalId=Id) %>%
+    separate_rows(Id, sep='\\+') %>% 
+    mutate(Id= str_replace(Id, '\\..*', ''))
+} else{
+  Complete <- Complete %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
+}
 
 right_join(gene_info, Complete) %>% 
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
