@@ -80,8 +80,7 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
 )
 interact <- strsplit(opt$interact, ',')[[1]]
 exclude <- strsplit(opt$exclude, ',')[[1]]
-batch <- strsplit(opt$batch, ',')[[1]]
-cofactor <- strsplit(opt$cofactor, ',')[[1]]
+batch <- c(strsplit(opt$batch, ',')[[1]], strsplit(opt$cofactor, ',')[[1]])
 
 projectName <- paste0(varInt, 
        ifelse(length(cofactor)>0, paste0('_', cofactor, collapse = ''), ''),
