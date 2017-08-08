@@ -209,12 +209,12 @@ if ( opt$tool == 'EdgeR' ) {
     # checking parameters
     checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
                       rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
-                      condRef=condRef,batch=batch,alpha=alpha,pAdjustMethod=pAdjustMethod,
+                      condRef=condRef,batch=c(batch, cofactor),alpha=alpha,pAdjustMethod=pAdjustMethod,
                       cpmCutoff=cpmCutoff,gene.selection=gene.selection,
                       normalizationMethod=normalizationMethod,colors=colors)
 
     out.edgeR <- run.edgeR(counts=counts, target=LibraryInfo, varInt=varInt, condRef=condRef,
-                       batch=batch, cpmCutoff=cpmCutoff, normalizationMethod=normalizationMethod,
+                       batch=c(batch, cofactor), cpmCutoff=cpmCutoff, normalizationMethod=normalizationMethod,
                        pAdjustMethod=pAdjustMethod)
 
     # MDS + clustering
@@ -226,12 +226,12 @@ if ( opt$tool == 'EdgeR' ) {
 # DEseq analysis
   checkParameters.DESeq2(projectName=projectName,author=author,targetFile=targetFile,
                                               rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
-                                              condRef=condRef,batch=batch,fitType=fitType,cooksCutoff=cooksCutoff,
+                                              condRef=condRef,batch=c(batch, cofactor),fitType=fitType,cooksCutoff=cooksCutoff,
                                               independentFiltering=independentFiltering,alpha=alpha,pAdjustMethod=pAdjustMethod,
                                               typeTrans=typeTrans,locfunc=locfunc,colors=colors)
 
   if (testMethod=='Wald' ) {
-    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
+    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=c(batch, cofactor), interact=interact,
                            locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
                            cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
     if (is.numeric(cooksCutoff)) {
