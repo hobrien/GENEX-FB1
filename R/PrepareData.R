@@ -1,5 +1,6 @@
 library(tidyverse)
 library(stringr)
+library(biomaRt)
 
 # Oh yes, thought of a catchy (and hopefully memorable) name for the dataset: 
 # GENEX-FB (for GENe EXpression in the Fetal Brain). 
@@ -76,3 +77,17 @@ right_join(gene_info, fittedPCW) %>%
 
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
 
+SampleInfo <- read_tsv("Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
+
+
+mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
+                         dataset = "hsapiens_gene_ensembl",
+                         host = 'ensembl.org')
+t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
+                                     "external_gene_name", "chromosome_name", "gene_biotype"), mart = mart)
+t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id,
+                     Id = ensembl_gene_id, SYMBOL = external_gene_name, Chr=chromosome_name, gene_type=gene_biotype)
+Sleuth <- read_delim("Results/SleuthPCW_RIN.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+Sleuth <- right_join(t2g, mutate(Sleuth, target_id=str_replace(target_id, '\\.[0-9]+', '')))
+write_tsv(Sleuth, "Results/SleuthPCW_RIN_annotated.txt")
