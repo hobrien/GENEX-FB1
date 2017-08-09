@@ -360,6 +360,83 @@ ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_po
     theme(legend.position = 'right')
 
 ```
+
+# Add Surrogate Variable Analysis
+
+``` {r sva}
+DESeqfitSVA <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq_sva3/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+
+DESeqfitSVA_sig <- filter(DESeqfitSVA, padj<.1)
+
+DESeq_vs_DESeqSVA <- filter(sigGenesDESeq, ageBin=='12-19') %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
+  full_join(dplyr::select(DESeqfitSVA_sig, Id, SYMBOL, Chr, gene_type), by = c("Id", "SYMBOL", "Chr", "gene_type")) %>%
+  left_join(dplyr::select(filter(DESeqfit, ageBin=='12-19'), Id, Sex, ChrType, DESeq_pvalue = pvalue, DESeq_padj = padj), by = "Id") %>%
+  left_join(dplyr::select(DESeqfitSVA, Id, DESeqSVA_pvalue=pvalue, DESeqSVA_padj=padj), by = "Id") %>% 
+  mutate(Method=ifelse(!is.na(DESeqSVA_padj) & DESeqSVA_padj < .1,
+                       ifelse(!is.na(DESeq_padj) & DESeq_padj < .1, 
+                              'Both Sig',
+                              'SVA Sig'),
+                       'DESeq Sig'),
+          Tested=ifelse(is.na(DESeqSVA_padj),
+                             'DESeq Tested',
+                             ifelse(is.na(DESeq_padj), 
+                                    'SVA Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        ) %>% 
+  group_by(Id) %>% slice(1) %>% ungroup() 
+
+dplyr::group_by(DESeq_vs_DESeqSVA, Tested, ChrType, Method) %>% summarise(n=n()) %>% spread(Method, n)
+
+ggplot(DESeq_vs_DESeqSVA, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ Method) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+ggplot(filter(DESeq_vs_DESeqSVA, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(DESeqSVA_padj)) , aes(x=DESeq_pvalue, y=DESeqSVA_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    #scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_DESeqSVA, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(DESeqSVA_padj)), aes(x=DESeq_padj, y=DESeqSVA_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    #scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
+    theme(legend.position = 'right')
+
+
+```
+
 # Compare DESeq2 to Sleuth
 - This is a slightly tricky comparison because DESeq2 works on gene-level counts while Sleuth works with transcript-level TPMs from Kalliso
 - Nevertheless, all DE genes should have one or more DE transcripts and DE transcripts should result in gene-level DE unless (A) the DE transcript is expressed at a low level relative to other isoforms or (B) isoform switching results in Male biased transcripts balancing out Female biased transcripts.
