@@ -118,11 +118,17 @@ PlotFC_by_ChrType <- function(genes, set_name) {
   plot        
 }
 
-Sleuth <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
+Sleuth <- read_delim("../Results/SleuthGenePCW_RIN.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+Sleuth <- dplyr::rename(Sleuth, Id=target_id)
+Sleuth <- right_join(gene_info, Sleuth)
+
+SleuthIsoform <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
                      "\t", escape_double = FALSE, trim_ws = TRUE)
 
 #select the transcript for each gene with the lowest qvalue
-SleuthTopIsoform <- Sleuth %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
+SleuthTopIsoform <- SleuthIsoform %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
+
 
 ```
 
@@ -438,33 +444,24 @@ ggplot(filter(DESeq_vs_DESeqSVA, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! 
 ```
 
 # Compare DESeq2 to Sleuth
-- This is a slightly tricky comparison because DESeq2 works on gene-level counts while Sleuth works with transcript-level TPMs from Kalliso
-- Nevertheless, all DE genes should have one or more DE transcripts and DE transcripts should result in gene-level DE unless (A) the DE transcript is expressed at a low level relative to other isoforms or (B) isoform switching results in Male biased transcripts balancing out Female biased transcripts.
-- Not that if there are large differences in isoform lengths, count differences will be obscured because I'm plotting TPM which is length-normalised. Kallisto also produces estimated counts, which I could plot instead, but there are trade-offs with both approaches.
+- Correspondance of p-values is generally poor
+- all DESeq genes with FDR < 0.001 (3 genes) are also sig by Sleuth
+- of 14 Sleuth genes with FDR < 0.001, only 6 were tested by DESeq and only 3 were significant (including 6 with Sleuth FDR < 1e-7 where one was tested by DESeq and it was not significant)
+
 
 - Both methods agree on Y genes.
 - Sleuth fails to pull out most PAR genes and some other X genes
 - Lists of autosomal genes are mostly orthogonal (3 in common out of 61)
 - Many autosomal genes tested only by Sleuth and some Y genes tested only by DESeq
-- Correspondance of p-values is generally poor
 
-```{r DESeq_vs_Sleuth}
-Sleuth <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
-                     "\t", escape_double = FALSE, trim_ws = TRUE)
+``` {r Sleuth_vs_DESeq}
+SleuthSig <- (filter(Sleuth, qval<.1 & ! is.na(Id)))
 
-#select the transcript for each gene with the lowest qvalue
-SleuthTopIsoform <- Sleuth %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
-
-# There is one sig transcript that is not in the latest version of BioMart and therefore doesn't have an gene Id
-SleuthSig <- (filter(SleuthTopIsoform, qval<.1 & ! is.na(Id)))
-
-# Need to join on Id, SYMBOL, Chr and gene_type because otherwise if these are added from one of the data sets, the values are NA for any genes that weren't tested for that dataset.
-# Unfortunately I've uesed different data sources for assigning SYMBOLs to the gene IDs. This means that some rows are duplicated. The group/slice/ungroup at the end takes care of this
 DESeq_vs_Sleuth <- filter(sigGenesDESeq, ageBin=='12-19') %>%
-  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
-  full_join(dplyr::select(SleuthSig, Id, SYMBOL, Chr, gene_type)) %>%
+  dplyr::select(Id, SYMBOL, Chr, ChrType, gene_type) %>%
+  full_join(dplyr::select(SleuthSig, Id, SYMBOL, Chr, ChrType, gene_type)) %>%
   left_join(dplyr::select(filter(DESeqfit, ageBin=='12-19'), Id, Sex, ChrType, DESeq_pvalue = pvalue, DESeq_padj = padj)) %>%
-  left_join(dplyr::select(SleuthTopIsoform, Id, Sleuth_pvalue=pval, Sleuth_padj=qval)) %>%
+  left_join(dplyr::select(Sleuth, Id, Sleuth_pvalue=pval, Sleuth_padj=qval)) %>%
   mutate(Method=ifelse(!is.na(Sleuth_padj) & Sleuth_padj < .1,
                        ifelse(!is.na(DESeq_padj) & DESeq_padj < .1, 
                               'Both Sig',
@@ -479,14 +476,12 @@ DESeq_vs_Sleuth <- filter(sigGenesDESeq, ageBin=='12-19') %>%
          ChrType=ifelse(is.na(ChrType), 
                         ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
                         ChrType)
-        ) %>% 
-  group_by(Id) %>% slice(1) %>% ungroup() 
+        )
 
 
 ggplot(DESeq_vs_Sleuth, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
     figure_theme() +
     facet_grid(Tested ~ Method) +
-    #scale_y_continuous(breaks=seq(100,1000,100)) +
     scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
     theme(strip.switch.pad.grid = unit(10, 'cm')) +
     ylab('Number sex-biased genes (FDR<0.1)') +
@@ -503,11 +498,8 @@ ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is
     geom_hline(yintercept=.1, linetype=3)+
     geom_vline(xintercept=.1, linetype=3)+
     figure_theme() +
-    scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
-    #scale_y_log10() + scale_x_log10() +
-    #xlab('Sex Chromosomes Included') +
-    #ylab('Sex Chromosomes Excluded') +
-    ggtitle('Nominal p-values (excludes SDCBP2-AS1 Sleuth p<1e-40, DESeq p>.01)') +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('Nominal p-values') +
     theme(legend.position = 'right')
 
 
@@ -517,16 +509,97 @@ ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is
     geom_abline(slope=1, intercept=0) +
     geom_hline(yintercept=.1, linetype=3)+
     geom_vline(xintercept=.1, linetype=3)+
-    #xlab('Sex Chromosomes Included') +
-    #ylab('Sex Chromosomes Excluded') +
-    scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
-    #scale_y_log10() + scale_x_log10() +
-    ggtitle('q-values (excludes SDCBP2-AS1 Sleuth q<1e-40, DESeq q>.1)') +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
     theme(legend.position = 'right')
 ```
 
-- One gene in particular (SDCBP2-AS1) is highly DE according to Sleuth and not at all according to DESeq
+# Gene-level vs. Transcript-level
+- All DE genes should have one or more DE transcripts and DE transcripts should result in gene-level DE unless (A) the DE transcript is expressed at a low level relative to other isoforms or (B) isoform switching results in Male biased transcripts balancing out Female biased transcripts
+- 
+
+
+
+```{r gene_vs_isoform}
+
+SleuthTopIsoformSig <- (filter(SleuthTopIsoform, qval<.1 & ! is.na(Id)))
+
+# Need to join on Id, SYMBOL, Chr and gene_type because otherwise if these are added from one of the data sets, the values are NA for any genes that weren't tested for that dataset.
+# Unfortunately I've uesed different data sources for assigning SYMBOLs to the gene IDs. This means that some rows are duplicated. The group/slice/ungroup at the end takes care of this
+gene_vs_isoform_Sleuth <- SleuthSig %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
+  full_join(dplyr::select(SleuthTopIsoformSig, Id, SYMBOL, Chr, gene_type)) %>% 
+  left_join(dplyr::select(Sleuth, Id, ChrType, gene_pvalue = pval, gene_padj = qval)) %>%
+  left_join(dplyr::select(SleuthTopIsoform, Id, isoform_pvalue=pval, isoform_padj=qval)) %>% 
+  mutate(Method=ifelse(!is.na(gene_padj) & gene_padj < .1,
+                       ifelse(!is.na(isoform_padj) & isoform_padj < .1, 
+                              'Both Sig',
+                              'Gene Sig'),
+                       'Isoform Sig'),
+          Tested=ifelse(is.na(gene_padj),
+                             'Isoform Tested',
+                             ifelse(is.na(isoform_padj), 
+                                    'Isoform Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        ) %>% 
+  group_by(Id) %>% slice(1) %>% ungroup() 
+
+#filter(gene_vs_isoform_Sleuth, ChrType=='autosomal') 
+ggplot(gene_vs_isoform_Sleuth, aes(x=Method, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ .) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(gene_vs_isoform_Sleuth, ! is.na(isoform_padj) & ! is.na(gene_padj)) , aes(x=gene_pvalue, y=isoform_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    #scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values ') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(gene_vs_isoform_Sleuth, ! is.na(gene_padj) & ! is.na(isoform_padj)), aes(x=gene_padj, y=isoform_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    #scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
+    theme(legend.position = 'right')
+```
+# plot genes with major differences between gene-level and transcript-level analyses
+
+- SDCBP2-AS1 is highly DE according to the Sleuth isoform analysis and less sig according to the gene-level analysis
     - This antisense transcript has 4 isoforms that are expressed at a moderately high level in both sexes but one is expressed very highly in some intermediate-age females
+- ANOS1 is highly significant according to isoform analysis and non-significant according to the gene-lvel analysis
+    - this is because there is a DE transcript that is expressed at much lower levels than the main transcript
+- AMY1A is similar, but there's only one isoform
+- DDX3X and ARSD have a lot of isoforms, one of which is DE, but it doesn't look that convincing (FDRs around 1e-4)
+
+- Not that if there are large differences in isoform lengths, count differences will be obscured because I'm plotting TPM which is length-normalised. Kallisto also produces estimated counts, which I could plot instead, but there are trade-offs with both approaches.
 
 ```{r}
 AllKallisto <- read_delim("../Counts/AllKallisto.txt", 
@@ -545,7 +618,7 @@ PlotTranscripts <- function(geneID, AllKallisto, Sleuth){
 
     p <- ggplot(counts, aes(x=Sex, y=TPM, colour=Sex)) +
       geom_jitter(height = 0, width=.25, alpha=.75) + 
-      facet_wrap(~ target_id, ncol=10) +
+      facet_wrap(~ target_id, ncol=6) +
       xlab('') +
       main_theme() +
       theme(legend.position='bottom') +
@@ -553,8 +626,6 @@ PlotTranscripts <- function(geneID, AllKallisto, Sleuth){
       ggtitle(geneID)
    p
 }
-PlotTranscripts('SDCBP2-AS1', AllKallisto, Sleuth)
-
 PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
     transcriptID = sub("(ENST[0-9]+)\\.[0-9]+", '\\1', transcriptID)
     counts <- filter(Sleuth, target_id == transcriptID) %>% 
@@ -565,7 +636,7 @@ PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
       mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
              Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
 
-    ggplot(counts, aes(x=PCW, y=TPM, colour=Sex)) +
+    p <- ggplot(counts, aes(x=PCW, y=TPM, colour=Sex)) +
       geom_jitter(height = 0, width=.25, alpha=.75) + 
       facet_wrap(~ target_id, ncol=10) +
       xlab('') +
@@ -575,9 +646,23 @@ PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
       ggtitle(geneID)
    p
 }
-PlotTranscriptByAge('ENST00000609745', AllKallisto, Sleuth)
+
+PlotTranscripts('SDCBP2-AS1', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000609745', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('ANOS1', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000481896', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('AMY1A', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('DDX3X', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000629496', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('ARSD', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000381154', AllKallisto, SleuthIsoform)
 
 ```
+
 
 # Gene Types
 - Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
