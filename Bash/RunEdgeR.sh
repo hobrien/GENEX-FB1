@@ -7,6 +7,7 @@
 
 
 Rscript R/FvsMedgeR.R --min 12 --max 20 --cofactor PCW --tool DESeq
+Rscript R/FvsMedgeR.R --min 12 --max 20 --cofactor PCW --tool DESeq --sva 3
 Rscript R/FvsMedgeR.R --min 12 --max 13 --tool DESeq
 Rscript R/FvsMedgeR.R --min 13 --max 14 --tool DESeq
 Rscript R/FvsMedgeR.R --min 14 --max 15 --tool DESeq

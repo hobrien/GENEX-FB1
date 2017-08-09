@@ -38,10 +38,10 @@ option_list <- list(
   make_option(c("-i", "--interaction"), type="character", default="", 
               help="Cofactors to interact with varInt", metavar = 'interact'),
   make_option(c("-f", "--feature"), type="character", default="genes", 
-              help="Type of feature to Analyse (genes, junctions, transcripts)")
-  
-  
-)
+              help="Type of feature to Analyse (genes, junctions, transcripts)"),
+  make_option(c("--sva"), type="integer", default=0, 
+              help="Number of Surrogate Variables to estimate")
+ )
 
 opt_parser <- OptionParser(option_list=option_list)
 opt <- parse_args(opt_parser)
@@ -79,11 +79,12 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  PCW_cutoff[1]
 )
 interact <- strsplit(opt$interact, ',')[[1]]
+
 exclude <- strsplit(opt$exclude, ',')[[1]]
 batch <- c(strsplit(opt$batch, ',')[[1]], strsplit(opt$cofactor, ',')[[1]])
 
 projectName <- paste0(varInt, 
-       ifelse(length(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
+       ifelse(nchar(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
        ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
        '_', ageBin,
        ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
@@ -94,7 +95,8 @@ projectName <- paste0(varInt,
        ifelse(length(exclude > 0),
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
        ifelse(opt$sex_chromosomes, '_autosomes', ''),
-       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature))
+       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature)),
+       ifelse(opt$sva > 0, paste0("_sva", opt$sva), "")
 )                         # name of the project
 print(paste("Saving output to", projectName))
 
@@ -231,7 +233,7 @@ if ( opt$tool == 'EdgeR' ) {
                                               typeTrans=typeTrans,locfunc=locfunc,colors=colors)
 
   if (testMethod=='Wald' ) {
-    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
+    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact, num_sva=opt$sva,
                            locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
                            cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
     if (is.numeric(cooksCutoff)) {
