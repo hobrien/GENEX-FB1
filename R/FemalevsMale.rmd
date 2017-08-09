@@ -118,6 +118,11 @@ PlotFC_by_ChrType <- function(genes, set_name) {
   plot        
 }
 
+Sleuth <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+
+#select the transcript for each gene with the lowest qvalue
+SleuthTopIsoform <- Sleuth %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
 
 ```
 
@@ -365,21 +370,10 @@ ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_po
 - Lists of autosomal genes are mostly orthogonal (3 in common out of 61)
 - Many autosomal genes tested only by Sleuth and some Y genes tested only by DESeq
 - Correspondance of p-values is generally poor
-- One gene in particular (SDCBP2-AS1) is highly DE according to Sleuth and not at all according to DESeq
-    - This antisense transcript has 4 isoforms that are expressed at a moderately high level in both sexes but one is expressed very highly in some intermediate-age females
 
 ```{r DESeq_vs_Sleuth}
-#read in Sleuth results and merge with gene info (using BioMart)
-mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
-                         dataset = "hsapiens_gene_ensembl",
-                         host = 'ensembl.org')
-t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
-                                     "external_gene_name", "chromosome_name", "gene_biotype"), mart = mart)
-t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id,
-                     Id = ensembl_gene_id, SYMBOL = external_gene_name, Chr=chromosome_name, gene_type=gene_biotype)
-Sleuth <- read_delim("../Results/SleuthPCW_RIN.txt", 
+Sleuth <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
                      "\t", escape_double = FALSE, trim_ws = TRUE)
-Sleuth <- right_join(t2g, mutate(Sleuth, target_id=str_replace(target_id, '\\.[0-9]+', ''))) %>% mutate(Chr=paste0('chr', Chr))
 
 #select the transcript for each gene with the lowest qvalue
 SleuthTopIsoform <- Sleuth %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
@@ -452,57 +446,56 @@ ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is
     #scale_y_log10() + scale_x_log10() +
     ggtitle('q-values (excludes SDCBP2-AS1 Sleuth q<1e-40, DESeq q>.1)') +
     theme(legend.position = 'right')
+```
 
-AllKallisto <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Counts/AllKallisto.txt", 
-                          "\t", escape_double = FALSE, trim_ws = TRUE)
+- One gene in particular (SDCBP2-AS1) is highly DE according to Sleuth and not at all according to DESeq
+    - This antisense transcript has 4 isoforms that are expressed at a moderately high level in both sexes but one is expressed very highly in some intermediate-age females
 
-AllKallisto <- right_join(t2g, mutate(AllKallisto, target_id=str_replace(target_id, '\\.[0-9]+', '')))
+```{r}
+AllKallisto <- read_delim("../Counts/AllKallisto.txt", 
+                          "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(target_id=str_replace(target_id, '\\.[0-9]+', ''))
 
 PlotTranscripts <- function(geneID, AllKallisto, Sleuth){
     geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-    counts <- filter(AllKallisto, Id == geneID | SYMBOL == geneID) %>% 
-      dplyr::select(-Id, -SYMBOL, -Chr, -gene_type) %>% 
-      gather(Sample, TPM, -target_id) %>% 
-      left_join(LibraryInfo) %>%
-      left_join(Sleuth) %>%
+    counts <- filter(Sleuth, Id == geneID | SYMBOL == geneID) %>% 
+      dplyr::select(target_id, pval, qval) %>%
+      left_join(AllKallisto) %>% 
+      gather(Sample, TPM, -target_id, -pval, -qval) %>% 
+      left_join(LibraryInfo) %>% 
       mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
              Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
 
-    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=factor(PCW))) +
+    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=Sex)) +
       geom_jitter(height = 0, width=.25, alpha=.75) + 
       facet_wrap(~ target_id, ncol=10) +
       xlab('') +
       main_theme() +
       theme(legend.position='bottom') +
       scale_colour_brewer(type = "qual", palette = 6) +
-      ggtitle(paste0(filter(counts, !is.na(Id))$Id[1], ' (', filter(counts, !is.na(SYMBOL))$SYMBOL[1], ')'))
+      ggtitle(geneID)
    p
 }
 PlotTranscripts('SDCBP2-AS1', AllKallisto, Sleuth)
 
-PlotTranscriptByAge <- function(geneID, AllKallisto, Sleuth){
-    geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-    counts <- filter(AllKallisto, target_id == geneID) %>% 
-      dplyr::select(-Id, -SYMBOL, -Chr, -gene_type) %>% 
-      gather(Sample, TPM, -target_id) %>% 
-      left_join(LibraryInfo) %>%
-      left_join(Sleuth) %>%
+PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
+    transcriptID = sub("(ENST[0-9]+)\\.[0-9]+", '\\1', transcriptID)
+    counts <- filter(Sleuth, target_id == transcriptID) %>% 
+      dplyr::select(target_id, pval, qval) %>%
+      left_join(AllKallisto) %>% 
+      gather(Sample, TPM, -target_id, -pval, -qval) %>% 
+      left_join(LibraryInfo) %>% 
       mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
-             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)),
-             ageBin=ifelse(PCW>14,
-                           ifelse(PCW>16,
-                                  '17-19',
-                                  '15-16'),
-                           PCW))
+             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
 
-    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=Sex)) +
+    ggplot(counts, aes(x=PCW, y=TPM, colour=Sex)) +
       geom_jitter(height = 0, width=.25, alpha=.75) + 
-      facet_wrap(~ PCW, ncol=10) +
+      facet_wrap(~ target_id, ncol=10) +
       xlab('') +
       main_theme() +
       theme(legend.position='bottom') +
       scale_colour_brewer(type = "qual", palette = 6) +
-      ggtitle(paste0(filter(counts, !is.na(Id))$Id[1], ' (', filter(counts, !is.na(SYMBOL))$SYMBOL[1], ')'))
+      ggtitle(geneID)
    p
 }
 PlotTranscriptByAge('ENST00000609745', AllKallisto, Sleuth)
