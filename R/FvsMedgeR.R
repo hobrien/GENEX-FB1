@@ -263,6 +263,7 @@ if ( opt$tool == 'EdgeR' ) {
 
 ################################################################################
 
+write_tsv(as.data.frame(colData(out.DESeq2$dds)), "tables/col_data.txt")
 # save image of the R session
 save.image(file=paste0(projectName, ".RData"))
 
