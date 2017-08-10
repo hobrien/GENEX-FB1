@@ -38,32 +38,7 @@ right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('norm'))) %>%
 
 fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-  mutate(ageBin='12-19') %>%
-  bind_rows(
-    read_delim("Results/Sex_12_FDR_0.1_DESeq/tables/BG12.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-      dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='12')
-  ) %>%
-  bind_rows(
-    read_delim("Results/Sex_13_FDR_0.1_DESeq/tables/BG13.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-      dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='13')
-  ) %>%
-  bind_rows(
-    read_delim("Results/Sex_14_FDR_0.1_DESeq/tables/BG14.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-      dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='14')
-  ) %>%
-  bind_rows(
-    read_delim("Results/Sex_15_17_FDR_0.1_DESeq/tables/BG15_17.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-      dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='15-16')
-  ) %>%
-  bind_rows(
-    read_delim("Results/Sex_17_20_FDR_0.1_DESeq/tables/BG17_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-      dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-      mutate(ageBin='17-19')
-  )
+  mutate(ageBin='12-19')
 
 right_join(gene_info, fittedBias) %>% 
   write_tsv("Shiny/GENEX-FB1/Data/fitted.txt")

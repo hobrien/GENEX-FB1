@@ -30,33 +30,6 @@ fittedPCW <- read_delim("./Data/dropPCW.complete.txt", "\t", escape_double = FAL
 
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
-PlotExpression<-function(geneID, counts, fittedPCW, target, ages) {
-  geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
-  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
-    gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
-    left_join(target) %>%
-    filter(PCW >= min & PCW <= max)
-  fit_params <- filter(fittedPCW, SYMBOL == geneID | Id == geneID) 
-  mean_age<-mean(target$PCW)
-  fit <- data.frame(PCW=seq(12,19)) %>%  mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
-  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
-  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
-    geom_jitter(height = 0, width=.1, alpha=.75) + 
-    geom_line(aes(y=fit), colour='black', data=fit) +
-    ylab("normalised counts") +
-    xlab('') +
-    main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) +
-    ggtitle(title) 
-  plot
-}
-
 PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
   fit_params <- fittedPCW[row_num,]
   geneID <- fit_params$SYMBOL
@@ -74,36 +47,6 @@ PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
     geom_line(aes(y=fit), colour='black', data=fit) +
     ylab("normalised counts") +
     xlab('post-conception weeks') +
-    main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) +
-    ggtitle(title) 
-  plot
-}
-
-PlotTimepoint<-function(geneID, counts, fitted, target, ages) {
-  geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
-  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
-    gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
-    left_join(target) %>%
-    filter(PCW >= min & PCW <= max)
-  mean <- filter(fitted, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
-  fc <- mean$log2FoldDiff[1] %>% format(digits=2)
-  pval <- mean$pvalue[1]
-  qval <- mean$padj[1]
-  mean <- mean %>% dplyr::select(Male, Female) %>%
-    gather('Sex', 'mean')
-  title<-paste0(geneID, ': log2 difference = ', fc, ', p=', pval, ', q=', qval)
-  plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
-    geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75) + 
-    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
-    ylab("normalised counts") +
-    xlab('') +
     main_theme() +
     scale_colour_brewer(type = "qual", palette = 6) +
     ggtitle(title) 
@@ -160,11 +103,6 @@ PlotSampleSize<-function(target, ages){
 
 shinyServer(function(session, input, output) {
   all_PCW = filter(fitted, ageBin=='12-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW12 = filter(fitted, ageBin=='12' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW13 = filter(fitted, ageBin=='13' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW14 = filter(fitted, ageBin=='14' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW15_16 = filter(fitted, ageBin=='15-16' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  PCW17_19 = filter(fitted, ageBin=='17-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
 
     observe({
     updateSliderInput(session, "pvalue", value = input$typedPval)
@@ -174,57 +112,15 @@ shinyServer(function(session, input, output) {
     req(input$mytable1_rows_selected)
     PlotTimepointRowNum(input$mytable1_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
   })
-  output$timepoint_12 <- renderPlot({
-    req(input$mytable2_rows_selected)
-    PlotTimepointRowNum(input$mytable2_rows_selected, counts , filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12')
-  })
-  output$timepoint_13 <- renderPlot({
-    req(input$mytable3_rows_selected)
-    PlotTimepointRowNum(input$mytable3_rows_selected, counts , filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '13')
-  })
-  output$timepoint_14 <- renderPlot({
-    req(input$mytable4_rows_selected)
-    PlotTimepointRowNum(input$mytable4_rows_selected, counts , filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '14')
-  })
-  output$timepoint_15_16 <- renderPlot({
-    req(input$mytable5_rows_selected)
-    PlotTimepointRowNum(input$mytable5_rows_selected, counts , filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '15-16')
-  })
-  output$timepoint_17_19 <- renderPlot({
-    req(input$mytable6_rows_selected)
-    PlotTimepointRowNum(input$mytable6_rows_selected, counts , filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '17-19')
-  })
   output$distPlot <- renderPlot({
     req(input$geneID)
     PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
-  })
-  output$timeCourse <- renderPlot({
-    req(input$geneID)
-    PlotExpression(toupper(input$geneID), counts, fittedPCW, target, input$ages)
   })
   output$timeCourseRowNum <- renderPlot({
     validate(
       need(input$mytable7_rows_selected != "", "Please select a row from the table")
     )
     PlotExpressionRowNum(input$mytable7_rows_selected, counts, filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
-  })
-  output$sampleSizeHist12_19 <- renderPlot({
-    PlotSampleSize(target, '12-19')
-  })
-  output$sampleSizeHist12 <- renderPlot({
-    PlotSampleSize(target, '12')
-  })
-  output$sampleSizeHist13 <- renderPlot({
-    PlotSampleSize(target, '13')
-  })
-  output$sampleSizeHist14 <- renderPlot({
-    PlotSampleSize(target, '14')
-  })
-  output$sampleSizeHist15_16 <- renderPlot({
-    PlotSampleSize(target, '15-16')
-  })
-  output$sampleSizeHist17_19 <- renderPlot({
-    PlotSampleSize(target, '17-19')
   })
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)
@@ -253,21 +149,6 @@ shinyServer(function(session, input, output) {
   output$mytable1 <- DT::renderDataTable({
     DT::datatable(add_links(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single")
   })
-  output$mytable2 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue) %>% add_links(), escape = FALSE, selection="single")
-  })
-  output$mytable3 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue) %>% add_links(), escape = FALSE, selection="single")
-  })
-  output$mytable4 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue) %>% add_links(), escape = FALSE, selection="single")
-  })
-  output$mytable5 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue) %>% add_links(), escape = FALSE, selection="single")
-  })
-  output$mytable6 <- DT::renderDataTable({
-    DT::datatable(filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue) %>% add_links(), escape = FALSE, selection="single")
-  })
   output$mytable7 <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single")
   })
@@ -277,41 +158,6 @@ shinyServer(function(session, input, output) {
       filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
-  )
-  output$download12 <- downloadHandler(
-    filename = function() { 'PCW12.txt' },
-    content = function(file) {
-      filter_table(PCW12, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
-        write_tsv(file)
-    }
-  )
-  output$download13 <- downloadHandler(
-    filename = function() { 'PCW13.txt' },
-    content = function(file) {
-      filter_table(PCW13, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
-        write_tsv(file)
-    }
-  )
-  output$download14 <- downloadHandler(
-    filename = function() { 'PCW14.txt' },
-    content = function(file) {
-      filter_table(PCW14, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
-        write_tsv(file)
-    }
-  )
-  output$download15_16 <- downloadHandler(
-    filename = function() { 'PCW15_16.txt' },
-    content = function(file) {
-      filter_table(PCW15_16, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
-        write_tsv(file)
-    }
-  )
-  output$download17_19 <- downloadHandler(
-    filename = function() { 'PCW17_19.txt' },
-    content = function(file) {
-      filter_table(PCW17_19, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
-        write_tsv(file)
-    }
   )
   output$downloadPCW <- downloadHandler(
     filename = function() { 'PCWdiffs.txt' },
