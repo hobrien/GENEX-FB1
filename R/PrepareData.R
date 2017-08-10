@@ -91,3 +91,8 @@ Sleuth <- read_delim("Results/SleuthPCW_RIN.txt",
                      "\t", escape_double = FALSE, trim_ws = TRUE)
 Sleuth <- right_join(t2g, mutate(Sleuth, target_id=str_replace(target_id, '\\.[0-9]+', '')))
 write_tsv(Sleuth, "Results/SleuthPCW_RIN_annotated.txt")
+
+AllKallisto <- read_delim("Counts/AllKallisto.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+AllKallisto <- right_join(t2g, mutate(Sleuth, target_id=str_replace(target_id, '\\.[0-9]+', '')))
+write_tsv(AllKallisto, "Counts/AllKallisto_annotated.txt")
