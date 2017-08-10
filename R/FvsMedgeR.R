@@ -40,8 +40,10 @@ option_list <- list(
   make_option(c("-f", "--feature"), type="character", default="genes", 
               help="Type of feature to Analyse (genes, junctions, transcripts)"),
   make_option(c("--sva"), type="integer", default=0, 
-              help="Number of Surrogate Variables to estimate")
- )
+              help="Number of Surrogate Variables to estimate"),
+  make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
+              help="Use counts derived from Kallisto")
+)
 
 opt_parser <- OptionParser(option_list=option_list)
 opt <- parse_args(opt_parser)
@@ -96,7 +98,8 @@ projectName <- paste0(varInt,
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
        ifelse(opt$sex_chromosomes, '_autosomes', ''),
        ifelse(opt$feature == 'genes', '', paste0('_', opt$feature)),
-       ifelse(opt$sva > 0, paste0("_sva", opt$sva), "")
+       ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
+       ifelse(opt$kallisto, "_kallistoCounts", "")
 )                         # name of the project
 print(paste("Saving output to", projectName))
 
@@ -145,7 +148,7 @@ locfunc <- "median"                                  # "median" (default) or "sh
 ################################################################################
 
 library(devtools)
-load_all(pkg = "R/SARTools")
+load_all(pkg = "~/BTSync/FetalRNAseq/Github/GENEX-FB1/R/SARTools")
 library(tidyverse)
 
 # loading target file
@@ -164,7 +167,7 @@ if (opt$feature == 'genes') {
   
 }
 LibraryInfo <- LibraryInfo %>%
-  select(Sample, Files, Sex, PCW, RIN, ReadLength, Sequencer) %>%
+  dplyr::select(Sample, Files, Sex, PCW, RIN, ReadLength, Sequencer) %>%
   mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
   arrange(Sex)
 if (!is.na(RIN_cutoff)) {
@@ -190,8 +193,16 @@ if (!is.null(male)) {
 }
 
 # loading counts
-counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
-
+if (opt$kallisto) {
+    library(tximport)
+    files <- file.path("Counts", LibraryInfo$Sample, "abundance.tsv")
+    names(files) <- LibraryInfo$Sample
+    tx2gene <- read_tsv("Data/tx2gene.txt")
+    counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
+    #counts <- tximport(files, type = "kallisto", txOut = TRUE, reader=read_tsv)
+} else {
+    counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
+}
 if (opt$sex_chromosomes) {
   excludedFeatures <- read_tsv("Data/genes.txt") %>% 
     filter(seqid == 'chrX' | seqid == 'chrY') %>% 
@@ -204,8 +215,11 @@ dir.create(workDir)
 setwd(workDir)
 
 # description plots
-majSequences <- descriptionPlots(counts=counts, group=LibraryInfo[,varInt], col=colors)
-
+if (opt$kallisto) {
+  majSequences <- descriptionPlots(counts=counts$counts, group=LibraryInfo[,varInt], col=colors)
+} else {
+  majSequences <- descriptionPlots(counts=counts, group=LibraryInfo[,varInt], col=colors)
+}
 # edgeR analysis
 if ( opt$tool == 'EdgeR' ) {
     # checking parameters
@@ -233,7 +247,7 @@ if ( opt$tool == 'EdgeR' ) {
                                               typeTrans=typeTrans,locfunc=locfunc,colors=colors)
 
   if (testMethod=='Wald' ) {
-    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact, num_sva=opt$sva,
+    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact, num_sva=opt$sva, kallisto=opt$kallisto,
                            locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
                            cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
     if (is.numeric(cooksCutoff)) {
@@ -256,7 +270,7 @@ if ( opt$tool == 'EdgeR' ) {
   # summary of the analysis (boxplots, dispersions, diag size factors, export table, nDiffTotal, histograms, MA plot)
   summaryResults <- summarizeResults.DESeq2(out.DESeq2, group=LibraryInfo[,varInt], col=colors,
                                           independentFiltering=independentFiltering,
-                                          cooksCutoff=cooksCutoff, alpha=alpha)
+                                          cooksCutoff=cooksCutoff, kallisto=opt$kallisto, alpha=alpha)
 } else {
   stop("Tool should be one of 'EdgeR', 'DESeq'")
 }
