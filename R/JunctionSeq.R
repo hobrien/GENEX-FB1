@@ -1,18 +1,30 @@
+# set a default repository for packages                         
+local({r <- getOption('repos')                                                                                                                                
+      r['CRAN'] <- 'http://www.stats.bris.ac.uk/R/'                                                                                                          
+      options(repos=r)                    
+}) 
+
+if(!require(JunctionSeq)) {
+    source("https://bioconductor.org/biocLite.R")
+    biocLite("JunctionSeq", ask=FALSE, suppressUpdates=FALSE)
+    install.packages("JunctionSeq", dependencies=T)
+}
+
 library(JunctionSeq)
 
-decoder <- read.table("JunctionSeqdecoder.bySample.txt",
+decoder <- read.table("Data/SampleInfo.txt",
                       header=TRUE,
                       stringsAsFactors=FALSE);
 gff.file <- "JunctionSeq/withNovel.forJunctionSeq.gff.gz"
 countFiles<- paste0("JunctionSeq/",
-                    decoder$sample.ID,
+                    decoder$Sample,
                     "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz")
 
 jscs <- runJunctionSeqAnalyses(sample.files = countFiles,
-                               sample.names = decoder$sample.ID,
-                               condition=factor(decoder$group.ID),
+                               sample.names = decoder$Sample,
+                               condition=factor(decoder$Sex),
                                flat.gff.file = gff.file,
-                               nCores = 8,
+                               nCores = 1,
                                analysis.type = "junctionsAndExons"
 )
 
