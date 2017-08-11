@@ -45,6 +45,7 @@ PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
     geom_line(aes(y=fit), colour='black', data=fit) +
+    scale_x_continuous(breaks=seq(12, 20)) +
     ylab("normalised counts") +
     xlab('post-conception weeks') +
     main_theme() +
