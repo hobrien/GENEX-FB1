@@ -643,7 +643,7 @@ PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
       main_theme() +
       theme(legend.position='bottom') +
       scale_colour_brewer(type = "qual", palette = 6) +
-      ggtitle(geneID)
+      ggtitle(transcriptID)
    p
 }
 
