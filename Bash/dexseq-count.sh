@@ -26,6 +26,8 @@ then
         echo "Could not get counts for $filename"
         exit 1
     fi    
+else
+   echo "file DEXSeq/$sampleID/$filename.dex_counts.txt already exists"
 fi
 
 
