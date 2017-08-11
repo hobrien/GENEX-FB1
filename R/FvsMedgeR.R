@@ -195,7 +195,7 @@ if (!is.null(male)) {
 if (opt$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
-    files <- file.path("Counts", LibraryInfo$Sample, "abundance.tsv")
+    files <- file.path("Kallisto", LibraryInfo$Sample, "abundance.tsv")
     names(files) <- LibraryInfo$Sample
     if ( opt$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
