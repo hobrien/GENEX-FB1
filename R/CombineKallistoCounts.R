@@ -9,7 +9,7 @@ for (fileName in args[2:length(args)]) {
              "\t", escape_double = FALSE, col_names = TRUE, 
              trim_ws = TRUE)
   input <- select(input, target_id, tpm)
-  colnames(input) <- c('target_id', str_replace(fileName, '.*/(.*).kallisto.txt', '\\1'))
+  colnames(input) <- c('target_id', str_replace(fileName, '.*/(.*)/.*' '\\1'))
   if (length(Counts) == 0) {
     Counts <- input
   } else {
