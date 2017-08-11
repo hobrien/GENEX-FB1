@@ -3,15 +3,17 @@
 #$ -cwd
 #$ -j y
 #$ -S /bin/bash
+#$ -l h_vmem=20G
 #
 
-export PATH=/share/apps/R-3.2.2/bin:/share/apps/:$PATH
 
+DIRECTORY=$1
+_JAVA_OPTIONS='-Xms256M -Xmx16G -XX:ParallelGCThreads=1'
 
 java -jar ~/src/QoRTs.jar mergeNovelSplices  \
                 --minCount 6 \
                 --stranded \
-                /c8000xd3/rnaseq-heath/Carolina/Counts/ \
-                ~/LabNotes/Carolina_sampleInfo.txt \
+                $DIRECTORY/ \
+                $DIRECTORY/decoder.bySample.txt \
                 /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.gtf \
-                /c8000xd3/rnaseq-heath/Carolina/Counts/
+                $DIRECTORY/
