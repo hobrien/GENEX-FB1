@@ -47,8 +47,8 @@ filter(QoRTs, stat=='frSecondStrand') %>%
   theme(legend.title=element_blank()) +
   theme(legend.position = "bottom")
 
-QoRTs %>% group_by(Sample) %>%
-  slice(1) %>% 
+QoRTs %>% group_by(Sample) %>% 
+  dplyr::slice(1) %>% 
   ungroup() %>%
   arrange(strand_ratio) %>%
   mutate(SampleNum=row_number()) %>% 

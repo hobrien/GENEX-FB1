@@ -51,6 +51,9 @@ if (is.null(opt$min) | is.null(opt$max)){
   print_help(opt_parser)
   stop("Min and Max ages must be specified", call.=FALSE)
 }
+if (! opt$feature %in% c('genes', 'junctions', 'transcripts')) {
+  stop("feature type not recognised. Must be one of (genes, junctions, transcripts)")
+}
 
 if ( opt$max-opt$min < 1 ) {
   print_help(opt_parser)
@@ -148,26 +151,22 @@ locfunc <- "median"                                  # "median" (default) or "sh
 ################################################################################
 
 library(devtools)
-load_all(pkg = "~/BTSync/FetalRNAseq/Github/GENEX-FB1/R/SARTools")
+load_all(pkg = "R/SARTools")
 library(tidyverse)
 
 # loading target file
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
-)
-
+) %>%
+  dplyr::select(Sample, Sex, PCW, RIN, ReadLength, Sequencer)
+  
 if (opt$feature == 'genes') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) 
 } else if (opt$feature == 'junctions') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.junctions.txt')) 
-} else if (opt$feature == 'transcripts') {
-  LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.kallisto.counts.txt')) 
-} else {
-  stop("feature type not recognised. Must be one of (genes, junctions, transcripts)")
-  
 }
+
 LibraryInfo <- LibraryInfo %>%
-  dplyr::select(Sample, Files, Sex, PCW, RIN, ReadLength, Sequencer) %>%
   mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
   arrange(Sex)
 if (!is.na(RIN_cutoff)) {
@@ -195,11 +194,16 @@ if (!is.null(male)) {
 # loading counts
 if (opt$kallisto) {
     library(tximport)
-    files <- file.path("Counts", LibraryInfo$Sample, "abundance.tsv")
-    names(files) <- LibraryInfo$Sample
     tx2gene <- read_tsv("Data/tx2gene.txt")
-    counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
-    #counts <- tximport(files, type = "kallisto", txOut = TRUE, reader=read_tsv)
+    files <- file.path("Kallisto", LibraryInfo$Sample, "abundance.tsv")
+    names(files) <- LibraryInfo$Sample
+    if ( opt$feature == 'genes' ) {
+      counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
+    } else if ( opt$feature == 'transcripts' ) {
+      counts <- tximport(files, type = "kallisto", txOut = TRUE, reader=read_tsv)
+    } else {
+      stop("Kallisto output cannot be used to analyse junctions")
+    }
 } else {
     counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
 }
@@ -285,6 +289,9 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, gene_type)
 
+if ( opt$feature == 'transcripts' ) {
+  gene_info <- rename(tx2gene, Id = transcript_id) %>% right_join(gene_info, by=c("gene_id" = "Id"))
+}
 if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
   downfile=paste0("tables/FemaleUp", ageBin, ".txt")

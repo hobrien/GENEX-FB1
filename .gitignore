@@ -58,3 +58,6 @@ R/SARTools
 
 # Log files
 Logs/*
+
+# info on setting up shiny app on server
+Shiny/GENEX-FB1/README.md
