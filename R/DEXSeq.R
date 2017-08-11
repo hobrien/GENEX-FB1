@@ -1,5 +1,4 @@
-library(readr)
-library(dplyr)
+library(tidyverse)
 library(stringr)
 library(DEXSeq)
 library(BiocParallel)
