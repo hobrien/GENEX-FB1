@@ -44,6 +44,7 @@ FastQC/*
 Counts/*
 Mappings/*
 Results/*
+Kallisto/*
 Figures/*
 Tables/*
 Documents/*
