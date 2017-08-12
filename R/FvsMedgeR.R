@@ -153,6 +153,7 @@ locfunc <- "median"                                  # "median" (default) or "sh
 library(devtools)
 load_all(pkg = "R/SARTools")
 library(tidyverse)
+library(RColorBrewer)
 
 # loading target file
 LibraryInfo <- read_tsv(targetFile, 
@@ -263,7 +264,7 @@ if ( opt$tool == 'EdgeR' ) {
     }  
   } else if (testMethod=='LRT' ) {
     out.DESeq2 <- run.DESeq2.LRT(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
-                               locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
+                               locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod, kallisto=opt$kallisto,
                                cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
   } else {
     stop("testMethod not recognised")
