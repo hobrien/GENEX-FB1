@@ -887,22 +887,12 @@ pca_df$Sample <- row.names(pca_df)
 pca_df <- left_join(pca_df, metadata)
 
 
-palette <- 6
-type = "qual"
 # axes 1 et 2
 PlotPCA <- function(pca_df, prp, colour, shape="Sex") {
-    if (is.numeric(colour)) {
-    palette <- 15
-    type <- "seq"
-  } else {
-    palette <- 6
-    type = "qual"
-  }
-  print(type)
+
   p1 <- ggplot(pca_df, aes_string(x="PC1", y="PC2", colour=colour, shape=shape)) + 
     geom_point() +
     stat_ellipse(aes(group = Sex)) +
-    #scale_colour_brewer(type = type, palette = palette) +
     xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
     ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
     fte_theme() +
@@ -910,18 +900,25 @@ PlotPCA <- function(pca_df, prp, colour, shape="Sex") {
     ggtitle(colour)
 
 
-	# axes 1 et 3
+	# axes 3 et 4
   p2 <- ggplot(pca_df, aes_string(x="PC4", y="PC3", colour=colour, shape=shape)) + 
     geom_point() +
     stat_ellipse(aes(group = Sex)) +
-    #scale_colour_brewer(type = type, palette = palette) +
     xlab(sprintf("PC4 (%0.1f%% explained var.)", prp[4])) +
     ylab(sprintf("PC3 (%0.1f%% explained var.)", prp[3])) +
     fte_theme() +
-    theme(aspect.ratio=1) 
-  grid.arrange(p1, p2, ncol=2)
+    theme(aspect.ratio=1)
+  
+  if (is.numeric(pca_df[[colour]])) {
+    grid.arrange(p1+scale_colour_distiller(type="seq", palette=15),
+                 p2+scale_colour_distiller(type="seq", palette=15), 
+                 ncol=2)
+  } else {
+    grid.arrange(p1+scale_colour_brewer(type="qual", palette=6),
+                 p2+scale_colour_brewer(type="qual", palette=6), 
+                 ncol=2)
+  }
 }
-
 PlotPCA(pca_df, prp, "Sex")
 PlotPCA(pca_df, prp, "ReadLength")
 PlotPCA(pca_df, prp, "RIN")
