@@ -8,7 +8,7 @@ library(biomaRt)
 # The larger dataset for eQTL / TWAS analysis (I reckon we'll get up to 150) would be GENEX-FB2: 
 # Genotypic effects. (If we grew the sample, we'd call it FB3 etc). 
 # We could also use GENEX for the adult brain samples (E.g. GENEX-AC (adult caudate)!
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+# setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 gene_info <- read_tsv("Data/genes.txt", col_types = cols(
   seqid = col_character(),
   source = col_character(),
@@ -29,22 +29,20 @@ gene_info <- read_tsv("Data/genes.txt", col_types = cols(
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, ChrType)
 
 
-counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(Id=str_extract(Id, '^[^.]+'))
 right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('norm'))) %>% 
   write_tsv("Shiny/GENEX-FB1/Data/counts12_20.txt")
 
-
-
-fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
   mutate(ageBin='12-19')
 
 right_join(gene_info, fittedBias) %>% 
   write_tsv("Shiny/GENEX-FB1/Data/fitted.txt")
 
-fittedPCW <- read_tsv("Results/PCW_Sex_12_20_FDR_0.1_DESeqLRT/tables/dropPCW.complete.txt") %>%
-  select(Id, baseMean, log2FoldChange, pvalue, padj) %>%
+fittedPCW <- read_tsv("Results/PCW_Sex_12_20_FDR_0.1_DESeqLRT_kallistoCounts/tables/dropPCW.complete.txt") %>%
+  dplyr::select(Id, baseMean, log2FoldChange, pvalue, padj) %>%
   mutate(Id = sub("\\.[0-9]+", "", Id))
 
 right_join(gene_info, fittedPCW) %>% 
