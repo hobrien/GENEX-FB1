@@ -32,7 +32,7 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                            HTML("<strong>Select row to plot data</strong><br>"),
                            actionButton("go", "Plot"),
                            HTML("<br><br><strong>Export Gene Table</strong><br>"),
-                           downloadButton('download12_19', 'Download Table')
+                           downloadButton('downloadSEX', 'Download Table')
                          ),   
                          conditionalPanel(
                            condition = 'input.tabs == "Transcript-level analysis"',
@@ -42,18 +42,18 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                            actionButton("go5", "Plot all transcripts from gene"),
                            #HTML("Plot all transcripts from gene"), 
                            HTML("<br><br><strong>Export Transcript Table</strong><br>"),
-                           downloadButton('download12_19_tr', 'Download Table')
+                           downloadButton('downloadSEX_tr', 'Download Table')
                          )   
                        ),
                        mainPanel(
                          tabsetPanel(
                            id = 'tabs',
                            tabPanel('Gene-level analysis', DT::dataTableOutput('mytable1'),
-                                    bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19"))
+                                    bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("SEXdiffs"))
                                     ),
                            tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
-                                    bsModal("sexDiffsTrans", "Sex Differences", "go2", size = "large",plotOutput("timepoint_12_19_trans")),
-                                    bsModal("sexDiffsAllTrans", "Sex Differences", "go5", size = "large",plotOutput("timepoint_all_trans"))
+                                    bsModal("sexDiffsTrans", "Sex Differences", "go2", size = "large",plotOutput("SEXdiffs_trans")),
+                                    bsModal("sexDiffsAllTrans", "Sex Differences", "go5", size = "large",plotOutput("SEXdiffs_all_trans"))
                            )
                            
                          )

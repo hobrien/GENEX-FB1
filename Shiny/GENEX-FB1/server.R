@@ -64,19 +64,15 @@ PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
 }
 #PlotExpressionRowNum(20, counts_tr, fittedPCW_tr, target)
 
-PlotTimepointRowNum<-function(row_num, counts, fitted, target, ages) {
+PlotTimepointRowNum<-function(row_num, counts, fitted, target) {
   selection <- fitted[row_num,]
   geneID <- selection$Id
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
   data <- counts %>% filter(Id == geneID) %>%  
     dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
-    left_join(target) %>%
-    filter(PCW >= min & PCW <= max)
+    left_join(target)
   mean <- selection %>% dplyr::select(Male, Female) %>%
     gather('Sex', 'mean')
   title<-paste0(selection$Id, ' (', selection$SYMBOL, ')')#: log2 change/week = ', selecton$log2FoldDiff, ', p=', selecton$pvalue, ', q=', selecton$padj)
@@ -128,31 +124,31 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
 
 
 shinyServer(function(session, input, output) {
-  all_PCW = filter(fitted, ageBin=='12-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  all_PCW = filter(fitted, !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
 
     observe({
     updateSliderInput(session, "pvalue", value = input$typedPval)
     updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
-  all_PCW_tr = filter(fitted_tr, ageBin=='12-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
+  all_PCW_tr = filter(fitted_tr, !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
   
     observe({
       updateSliderInput(session, "pvalue", value = input$typedPval)
       updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
-  output$timepoint_12_19 <- renderPlot({
+  output$SEXdiffs<- renderPlot({
     validate(
       need(input$mytable1_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$mytable1_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
+    PlotTimepointRowNum(input$mytable1_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
-  output$timepoint_12_19_trans <- renderPlot({
+  output$SEXdiffs_trans <- renderPlot({
     validate(
       need(input$mytable2_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$mytable1_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
+    PlotTimepointRowNum(input$mytable1_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
-  output$timepoint_all_trans <- renderPlot({
+  output$SEXdiffs_all_trans <- renderPlot({
     validate(
       need(input$mytable2_rows_selected != "", "Please select a row from the table")
     )
@@ -216,15 +212,15 @@ shinyServer(function(session, input, output) {
   output$mytable4 <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links_tr(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
-  output$download12_19 <- downloadHandler(
-    filename = function() { 'PCW12_19.txt' },
+  output$downloadSEX <- downloadHandler(
+    filename = function() { 'SEXdiffs.txt' },
     content = function(file) {
       filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
   )
-  output$download12_19_tr <- downloadHandler(
-    filename = function() { 'PCW12_19_tr.txt' },
+  output$downloadSEX_tr <- downloadHandler(
+    filename = function() { 'SEXdiffs_tr.txt' },
     content = function(file) {
       filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
