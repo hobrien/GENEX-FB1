@@ -206,17 +206,24 @@ shinyServer(function(session, input, output) {
            Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, " target='_blank'>", Id, "</a>")
            )         
   }
+  
+  add_links_tr <-function(fitted) {
+    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
+           GeneId=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", GeneId, " target='_blank'>", GeneId, "</a>")
+    )         
+  }
+  
   output$mytable1 <- DT::renderDataTable({
     DT::datatable(add_links(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
   output$mytable2 <- DT::renderDataTable({
-    DT::datatable(add_links(filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
+    DT::datatable(add_links_tr(filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
   output$mytable3 <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
   output$mytable4 <- DT::renderDataTable({
-    DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
+    DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links_tr(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
   output$download12_19 <- downloadHandler(
     filename = function() { 'PCW12_19.txt' },
