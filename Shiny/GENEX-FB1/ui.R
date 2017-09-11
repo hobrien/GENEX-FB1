@@ -49,7 +49,7 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                                     bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19"))
                                     ),
                            tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
-                                    bsModal("sexDiffsTrans", "Sex Differences Tr", "go2", size = "large",plotOutput("timepoint_12_19_trans"))
+                                    bsModal("sexDiffsTrans", "Sex Differences", "go2", size = "large",plotOutput("timepoint_12_19_trans"))
                            )
                            
                          )
@@ -70,14 +70,14 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                                     min = 0, max = 1, value = 0.1, step= 0.01),
                         textInput("typedPvalPCW", "Type p-value", value=.1),
                         conditionalPanel(
-                          condition = 'input.tabs == "Gene-level analysis"',
+                          condition = 'input.tabs2 == "Gene-level analysis"',
                           HTML("<strong>Select row to plot gene-level data</strong><br>"),
                           actionButton("go3", "Plot"),
                           HTML("<br><br><strong>Export Gene Table</strong><br>"),
                           downloadButton('downloadPCW', 'Download')
                         ),
                         conditionalPanel(
-                          condition = 'input.tabs == "Transcript-level analysis"',
+                          condition = 'input.tabs2 == "Transcript-level analysis"',
                           HTML("<strong>Select row to plot transcripts</strong><br>"),
                           actionButton("go4", "Plot"),
                           HTML("<br><br><strong>Export Transcript Table</strong><br>"),
@@ -86,7 +86,7 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                       ),
                       mainPanel(
                         tabsetPanel(
-                          id = 'tabs',
+                          id = 'tabs2',
                           tabPanel('Gene-level analysis', DT::dataTableOutput('mytable3'),
                                     bsModal("timeCoursePlot", "Expression Trajectory", "go3", size = "large",plotOutput("timeCourseRowNum"))
                           ),
