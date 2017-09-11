@@ -138,21 +138,21 @@ shinyServer(function(session, input, output) {
   })
   output$SEXdiffs<- renderPlot({
     validate(
-      need(input$mytable1_rows_selected != "", "Please select a row from the table")
+      need(input$SexDiffTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$mytable1_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
+    PlotTimepointRowNum(input$SexDiffTable_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
   output$SEXdiffs_trans <- renderPlot({
     validate(
-      need(input$mytable2_rows_selected != "", "Please select a row from the table")
+      need(input$SexDiffTrTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$mytable1_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
+    PlotTimepointRowNum(input$SexDiffTrTable_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
   output$SEXdiffs_all_trans <- renderPlot({
     validate(
-      need(input$mytable2_rows_selected != "", "Please select a row from the table")
+      need(input$SexDiffTrTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTranscriptsRowNum(counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$mytable2_rows_selected,], fitted_tr, target)
+    PlotTranscriptsRowNum(counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$SexDiffTrTable_rows_selected,], fitted_tr, target)
   })
   output$distPlot <- renderPlot({
     req(input$geneID)
@@ -160,15 +160,15 @@ shinyServer(function(session, input, output) {
   })
   output$timeCourseRowNum <- renderPlot({
     validate(
-      need(input$mytable3_rows_selected != "", "Please select a row from the table")
+      need(input$PCWTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotExpressionRowNum(input$mytable3_rows_selected, counts, filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
+    PlotExpressionRowNum(input$PCWTable_rows_selected, counts, filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
   })
   output$timeCourseRowNum_tr <- renderPlot({
     validate(
-      need(input$mytable4_rows_selected != "", "Please select a row from the table")
+      need(input$PCWTableTr_rows_selected != "", "Please select a row from the table")
     )
-    PlotExpressionRowNum(input$mytable4_rows_selected, counts_tr, filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
+    PlotExpressionRowNum(input$PCWTableTr_rows_selected, counts_tr, filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
   })
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)
@@ -200,16 +200,16 @@ shinyServer(function(session, input, output) {
     )         
   }
   
-  output$mytable1 <- DT::renderDataTable({
+  output$SexDiffTable <- DT::renderDataTable({
     DT::datatable(add_links(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
-  output$mytable2 <- DT::renderDataTable({
+  output$SexDiffTrTable <- DT::renderDataTable({
     DT::datatable(add_links_tr(filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
-  output$mytable3 <- DT::renderDataTable({
+  output$PCWTable <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
-  output$mytable4 <- DT::renderDataTable({
+  output$PCWTableTr <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links_tr(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
   output$downloadSEX <- downloadHandler(
