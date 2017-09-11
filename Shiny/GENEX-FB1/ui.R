@@ -37,7 +37,10 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                          conditionalPanel(
                            condition = 'input.tabs == "Transcript-level analysis"',
                            HTML("<strong>Select row to plot data</strong><br>"),
-                           actionButton("go2", "Plot"),
+                           actionButton("go2", "Plot individual transcript"), 
+                           #HTML("Plot individual transcript:"), 
+                           actionButton("go5", "Plot all transcripts from gene"),
+                           #HTML("Plot all transcripts from gene"), 
                            HTML("<br><br><strong>Export Transcript Table</strong><br>"),
                            downloadButton('download12_19_tr', 'Download Table')
                          )   
@@ -49,7 +52,8 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                                     bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19"))
                                     ),
                            tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
-                                    bsModal("sexDiffsTrans", "Sex Differences", "go2", size = "large",plotOutput("timepoint_12_19_trans"))
+                                    bsModal("sexDiffsTrans", "Sex Differences", "go2", size = "large",plotOutput("timepoint_12_19_trans")),
+                                    bsModal("sexDiffsAllTrans", "Sex Differences", "go5", size = "large",plotOutput("timepoint_all_trans"))
                            )
                            
                          )

@@ -62,15 +62,16 @@ PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
     ggtitle(title) 
   plot
 }
+#PlotExpressionRowNum(20, counts_tr, fittedPCW_tr, target)
 
 PlotTimepointRowNum<-function(row_num, counts, fitted, target, ages) {
   selection <- fitted[row_num,]
-  geneID <- selection$SYMBOL
+  geneID <- selection$Id
   ageSplit <- strsplit(ages, '-')[[1]]
   min <- ageSplit[1]
   max <- ageSplit[length(ageSplit)]
-  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
+  data <- counts %>% filter(Id == geneID) %>%  
+    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
@@ -89,7 +90,8 @@ PlotTimepointRowNum<-function(row_num, counts, fitted, target, ages) {
     scale_colour_brewer(type = "qual", palette = 6) 
   plot
 }
-
+#PlotTimepointRowNum(20, counts_tr, all_PCW_tr, target, '12-19')
+  
 PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
   #selection <- fitted[row_num,]
   geneID <- selection$GeneId
@@ -170,7 +172,13 @@ shinyServer(function(session, input, output) {
     validate(
       need(input$mytable2_rows_selected != "", "Please select a row from the table")
     )
-    PlotTranscriptsRowNum(counts_tr , filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$mytable2_rows_selected,], fitted_tr, target)
+    PlotTimepointRowNum(input$mytable1_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
+  })
+  output$timepoint_all_trans <- renderPlot({
+    validate(
+      need(input$mytable2_rows_selected != "", "Please select a row from the table")
+    )
+    PlotTranscriptsRowNum(counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$mytable2_rows_selected,], fitted_tr, target)
   })
   output$distPlot <- renderPlot({
     req(input$geneID)
