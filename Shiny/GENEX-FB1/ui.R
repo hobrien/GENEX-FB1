@@ -35,9 +35,13 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                        mainPanel(
                          tabsetPanel(
                            id = 'dataset',
-                           tabPanel('Genes exhibiting sex differences in fetal brain expression', DT::dataTableOutput('mytable1'),
+                           tabPanel('Gene-level analysis', DT::dataTableOutput('mytable1'),
                                     bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19"))
-                                    )
+                                    )#,
+                           #tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
+                          #          bsModal("sexDiffsTrans", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19_trans"))
+                          # )
+                           
                          )
                        )
                      )
@@ -65,10 +69,12 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                       mainPanel(
                         tabsetPanel(
                           id = 'dataset',
-                          tabPanel('Genes exhibiting differences in fetal brain expression over development', DT::dataTableOutput('mytable7'),
-                          #plotOutput("timeCourseRowNum"),
-                          bsModal("timeCoursePlot", "Expression Trajectory", "go2", size = "large",plotOutput("timeCourseRowNum"))
-                          )
+                          tabPanel('Gene-level analysis', DT::dataTableOutput('mytable3'),
+                                    bsModal("timeCoursePlot", "Expression Trajectory", "go2", size = "large",plotOutput("timeCourseRowNum"))
+                          )#,
+                          #tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable4'),
+                          #         bsModal("timeCoursePlot", "Expression Trajectory", "go2", size = "large",plotOutput("timeCourseRowNum"))
+                          #)
                         )
                       )
                     )
