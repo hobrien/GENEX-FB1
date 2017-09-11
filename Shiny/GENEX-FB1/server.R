@@ -126,28 +126,6 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
 #PlotTranscriptsRowNum(20, counts_tr, fitted_tr, target, '12-19')
 #PlotTranscriptsRowNum(counts_tr , filter(fitted_tr, Id=='ENST00000359939'), fitted_tr, target)
 
-PlotSampleSize<-function(target, ages){
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
-  target2 <- target %>% filter(PCW >= min & PCW <= max) %>% mutate(age_bin =ifelse(PCW == 16, 15, 
-                                           ifelse(PCW > 16, 16, PCW)))
-  
-  plot <- ggplot(target2, aes(x=age_bin, fill=Sex)) +
-    geom_bar() +
-    facet_grid(Sex ~ .) +
-    side_theme() +
-    ggtitle("Sample Size") +
-    scale_y_continuous(breaks=seq(0,100, 5)) +
-    scale_x_continuous(limits=c(11, 17),
-                       breaks=c(11,12,13,14,15,16),
-                       labels=c('11','12','13','14','15-16','17-19')) +
-    side_theme() +
-    xlab("Post Conception Weeks") +
-    ylab("Count") +
-    scale_fill_brewer(type = "qual", palette = 6) 
-  plot
-}
 
 shinyServer(function(session, input, output) {
   all_PCW = filter(fitted, ageBin=='12-19' & !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
