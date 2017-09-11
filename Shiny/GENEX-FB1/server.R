@@ -17,28 +17,7 @@ library(DT)
 
 # setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Shiny/GENEX-FB1")
 
-target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
-
-counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
-
-fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
-
-fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
-
-counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
-
-fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
-
-fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
-
+################################## Define functions ##################################
 PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
   fit_params <- fittedPCW[row_num,]
   geneID <- fit_params$Id
@@ -122,37 +101,86 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
 #PlotTranscriptsRowNum(20, counts_tr, fitted_tr, target, '12-19')
 #PlotTranscriptsRowNum(counts_tr , filter(fitted_tr, Id=='ENST00000359939'), fitted_tr, target)
 
+filter_table <- function(fitted, ChrTypeList, Bias, p_type, p_val) {
+  fitted <- filter(fitted, !is.na(padj) & UQ(as.name(p_type)) < p_val ) %>%
+    arrange(UQ(as.name(p_type))) %>%
+    filter(ChrType %in% ChrTypeList) %>% 
+    dplyr::select(-ChrType)
+  if (Bias == 'MaleUp') {
+    fitted <- fitted %>% filter(log2FoldDiff > 0)
+  } else if (Bias == 'FemaleUp') {
+    fitted <- fitted %>% filter(log2FoldDiff < 0)
+  }
+  fitted
+}
 
+add_links <-function(fitted) {
+  mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
+         GTEx=paste0("<a href=https://gtexportal.org/home/gene/", Id, " target='_blank'>GTEx</a>"),
+         Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, " target='_blank'>", Id, "</a>")
+  )         
+}
+
+add_links_tr <-function(fitted) {
+  mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
+         GeneId=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", GeneId, " target='_blank'>", GeneId, "</a>")
+  )         
+}
+
+################################## Load Data ##################################
+target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
+
+counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
+  arrange(padj)
+
+fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
+  arrange(padj)
+
+counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange)
+
+fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange)
+
+################################## Run server ##################################
 shinyServer(function(session, input, output) {
-  all_PCW = filter(fitted, !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-
-    observe({
+  observe({
     updateSliderInput(session, "pvalue", value = input$typedPval)
     updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
-  all_PCW_tr = filter(fitted_tr, !is.na(padj)) %>% dplyr::select(-ageBin) %>% arrange(padj)
-  
-    observe({
-      updateSliderInput(session, "pvalue", value = input$typedPval)
-      updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
+  observe({
+    updateSliderInput(session, "pvalue", value = input$typedPval)
+    updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
+
+  ################################## Render plots ################################## 
   output$SEXdiffs<- renderPlot({
     validate(
       need(input$SexDiffTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$SexDiffTable_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
+    PlotTimepointRowNum(input$SexDiffTable_rows_selected, counts , filter_table(fitted, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
   output$SEXdiffs_trans <- renderPlot({
     validate(
       need(input$SexDiffTrTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTimepointRowNum(input$SexDiffTrTable_rows_selected, counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
+    PlotTimepointRowNum(input$SexDiffTrTable_rows_selected, counts_tr, filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target)
   })
   output$SEXdiffs_all_trans <- renderPlot({
     validate(
       need(input$SexDiffTrTable_rows_selected != "", "Please select a row from the table")
     )
-    PlotTranscriptsRowNum(counts_tr, filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$SexDiffTrTable_rows_selected,], fitted_tr, target)
+    PlotTranscriptsRowNum(counts_tr, filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$SexDiffTrTable_rows_selected,], fitted_tr, target)
   })
   output$distPlot <- renderPlot({
     req(input$geneID)
@@ -173,38 +201,13 @@ shinyServer(function(session, input, output) {
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)
   })
-  
-  filter_table <- function(fitted, ChrTypeList, Bias, p_type, p_val) {
-    fitted <- filter(fitted, UQ(as.name(p_type)) < p_val ) %>%
-      arrange(UQ(as.name(p_type))) %>%
-      filter(ChrType %in% ChrTypeList) %>% 
-      dplyr::select(-ChrType)
-    if (Bias == 'MaleUp') {
-      fitted <- fitted %>% filter(log2FoldDiff > 0)
-    } else if (Bias == 'FemaleUp') {
-      fitted <- fitted %>% filter(log2FoldDiff < 0)
-    }
-    fitted
-  }
-  
-  add_links <-function(fitted) {
-    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
-           GTEx=paste0("<a href=https://gtexportal.org/home/gene/", Id, " target='_blank'>GTEx</a>"),
-           Id=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", Id, " target='_blank'>", Id, "</a>")
-           )         
-  }
-  
-  add_links_tr <-function(fitted) {
-    mutate(fitted, SYMBOL=paste0("<a href=http://www.genecards.org/cgi-bin/carddisp.pl?gene=", SYMBOL, " target='_blank'>", SYMBOL, "</a>"),
-           GeneId=paste0("<a href=http://www.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=", GeneId, " target='_blank'>", GeneId, "</a>")
-    )         
-  }
-  
+
+  ################################## Render tables ################################## 
   output$SexDiffTable <- DT::renderDataTable({
-    DT::datatable(add_links(filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
+    DT::datatable(add_links(filter_table(fitted, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
   output$SexDiffTrTable <- DT::renderDataTable({
-    DT::datatable(add_links_tr(filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
+    DT::datatable(add_links_tr(filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
   output$PCWTable <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
@@ -212,17 +215,19 @@ shinyServer(function(session, input, output) {
   output$PCWTableTr <- DT::renderDataTable({
     DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links_tr(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
   })
+  
+  ################################## Download tables ################################## 
   output$downloadSEX <- downloadHandler(
     filename = function() { 'SEXdiffs.txt' },
     content = function(file) {
-      filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
+      filter_table(fitted, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
   )
   output$downloadSEX_tr <- downloadHandler(
     filename = function() { 'SEXdiffs_tr.txt' },
     content = function(file) {
-      filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
+      filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
   )
@@ -240,5 +245,4 @@ shinyServer(function(session, input, output) {
         write_tsv(file)
     }
   )
-  
 })
