@@ -41,16 +41,16 @@ fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE,
 
 PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
   fit_params <- fittedPCW[row_num,]
-  geneID <- fit_params$SYMBOL
-  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr, -ChrType) %>%
+  geneID <- fit_params$Id
+  data <- counts %>% filter(Id == geneID) %>%  
+    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
     gather() %>%
     separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
     dplyr::select(Sample, value) %>%
     left_join(target)
   mean_age<-mean(target$PCW)
   fit <- data.frame(PCW=seq(12,19)) %>% mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
-  title<-paste0(geneID, ': log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
+  title<-paste0(geneID, ' (', fit_params$SYMBOL, ')')#: log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
     geom_line(aes(y=fit), colour='black', data=fit) +
@@ -78,46 +78,52 @@ PlotTimepointRowNum<-function(row_num, counts, fitted, target, ages) {
     filter(PCW >= min & PCW <= max)
   mean <- selection %>% dplyr::select(Male, Female) %>%
     gather('Sex', 'mean')
+  title<-paste0(selection$Id, ' (', selection$SYMBOL, ')')#: log2 change/week = ', selecton$log2FoldDiff, ', p=', selecton$pvalue, ', q=', selecton$padj)
   plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
     geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75) + 
     geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
     ylab("normalised counts") +
     xlab('') +
     main_theme() +
+    ggtitle(title) +
     scale_colour_brewer(type = "qual", palette = 6) 
   plot
 }
 
-PlotTranscriptsRowNum <- function(row_num, counts, fitted, target, ages) {
-  selection <- fitted[row_num,]
+PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
+  #selection <- fitted[row_num,]
   geneID <- selection$GeneId
   symbol <- selection$SYMBOL
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
+  mean <- filter(fitted, GeneId == geneID) %>% dplyr::select(Male, Female, Id, qval=padj) %>%
+    gather('Sex', 'mean', -Id, -qval) %>%
+    mutate(facet=paste0(Id, '\nFDR=', signif(qval, digits = 3)), Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+
   data <- filter(counts, GeneId == geneID) %>% 
-    dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
-    gather(key, value, -Id) %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value, Id) %>%
-    left_join(target) %>%
-    filter(PCW >= min & PCW <= max) %>%
-    mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
-  mean <- selection %>% dplyr::select(Male, Female, Id) %>%
-    gather('Sex', 'mean', -Id) %>%
-    mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+      dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
+      gather(key, value, -Id) %>%
+      separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+      dplyr::select(Sample, value, Id) %>%
+      left_join(target) %>%
+      filter(PCW >= min & PCW <= max) %>%
+      mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
+      left_join(dplyr::select(mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
+      mutate(facet=paste0(Id, '\nFDR=', signif(qval, digits = 3)))
+  
+  title<-paste0(selection$GeneId, ' (', selection$SYMBOL, ')')#: log2 change/week = ', selecton$log2FoldDiff, ', p=', selecton$pvalue, ', q=', selecton$padj)
   
   plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
     geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75) + 
     geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
-    facet_wrap(~ Id, ncol=6) +
+    facet_wrap(~ facet, ncol=6) +
     ylab("normalised counts") +
     xlab('') +
     main_theme() +
+    ggtitle(title) +
     scale_colour_brewer(type = "qual", palette = 6) 
   plot
 }
 #PlotTranscriptsRowNum(20, counts_tr, fitted_tr, target, '12-19')
+#PlotTranscriptsRowNum(counts_tr , filter(fitted_tr, Id=='ENST00000359939'), fitted_tr, target)
 
 PlotSampleSize<-function(target, ages){
   ageSplit <- strsplit(ages, '-')[[1]]
@@ -161,11 +167,11 @@ shinyServer(function(session, input, output) {
     )
     PlotTimepointRowNum(input$mytable1_rows_selected, counts , filter_table(all_PCW, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
   })
-  output$timepoint_12_19_tr <- renderPlot({
+  output$timepoint_12_19_trans <- renderPlot({
     validate(
       need(input$mytable2_rows_selected != "", "Please select a row from the table")
     )
-    PlotTranscriptsRowNum(input$mytable2_rows_selected, counts , filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue), target, '12-19')
+    PlotTranscriptsRowNum(counts_tr , filter_table(all_PCW_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$mytable2_rows_selected,], fitted_tr, target)
   })
   output$distPlot <- renderPlot({
     req(input$geneID)
@@ -181,7 +187,7 @@ shinyServer(function(session, input, output) {
     validate(
       need(input$mytable4_rows_selected != "", "Please select a row from the table")
     )
-    PlotExpressionRowNum(input$mytable4_rows_selected, counts, filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
+    PlotExpressionRowNum(input$mytable4_rows_selected, counts_tr, filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
   })
   output$sampleSizeHist <- renderPlot({
     PlotSampleSize(target, input$ages)

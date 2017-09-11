@@ -27,20 +27,30 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                          sliderInput("pvalue", "p-value:", 
                                      min = 0, max = 1, value = 0.1, step= 0.01),
                          textInput("typedPval", "Type p-value", value=.1),
-                         HTML("<strong>Select row to plot data</strong><br>"),
-                         actionButton("go", "Plot"),
-                         HTML("<br><br><strong>Export Table</strong><br>"),
-                         downloadButton('download12_19', 'Download Table')
-                        ),
+                         conditionalPanel(
+                           condition = 'input.tabs == "Gene-level analysis"',
+                           HTML("<strong>Select row to plot data</strong><br>"),
+                           actionButton("go", "Plot"),
+                           HTML("<br><br><strong>Export Gene Table</strong><br>"),
+                           downloadButton('download12_19', 'Download Table')
+                         ),   
+                         conditionalPanel(
+                           condition = 'input.tabs == "Transcript-level analysis"',
+                           HTML("<strong>Select row to plot data</strong><br>"),
+                           actionButton("go2", "Plot"),
+                           HTML("<br><br><strong>Export Transcript Table</strong><br>"),
+                           downloadButton('download12_19_tr', 'Download Table')
+                         )   
+                       ),
                        mainPanel(
                          tabsetPanel(
-                           id = 'dataset',
+                           id = 'tabs',
                            tabPanel('Gene-level analysis', DT::dataTableOutput('mytable1'),
                                     bsModal("sexDiffsPlot", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19"))
-                                    )#,
-                           #tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
-                          #          bsModal("sexDiffsTrans", "Sex Differences", "go", size = "large",plotOutput("timepoint_12_19_trans"))
-                          # )
+                                    ),
+                           tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable2'),
+                                    bsModal("sexDiffsTrans", "Sex Differences Tr", "go2", size = "large",plotOutput("timepoint_12_19_trans"))
+                           )
                            
                          )
                        )
@@ -59,22 +69,30 @@ navbarPage("Fetal Brain Sequencing 1: Sex Differences",
                         sliderInput("pvaluePCW", "p-value:", 
                                     min = 0, max = 1, value = 0.1, step= 0.01),
                         textInput("typedPvalPCW", "Type p-value", value=.1),
-                        HTML("<strong>Select row to plot data</strong><br>"),
-                        actionButton("go2", "Plot"),
-                        HTML("<br><br><strong>Export Table</strong><br>"),
-                        downloadButton('downloadPCW', 'Download')
-       
-                        
+                        conditionalPanel(
+                          condition = 'input.tabs == "Gene-level analysis"',
+                          HTML("<strong>Select row to plot gene-level data</strong><br>"),
+                          actionButton("go3", "Plot"),
+                          HTML("<br><br><strong>Export Gene Table</strong><br>"),
+                          downloadButton('downloadPCW', 'Download')
+                        ),
+                        conditionalPanel(
+                          condition = 'input.tabs == "Transcript-level analysis"',
+                          HTML("<strong>Select row to plot transcripts</strong><br>"),
+                          actionButton("go4", "Plot"),
+                          HTML("<br><br><strong>Export Transcript Table</strong><br>"),
+                          downloadButton('downloadPCW_tr', 'Download')
+                        )
                       ),
                       mainPanel(
                         tabsetPanel(
-                          id = 'dataset',
+                          id = 'tabs',
                           tabPanel('Gene-level analysis', DT::dataTableOutput('mytable3'),
-                                    bsModal("timeCoursePlot", "Expression Trajectory", "go2", size = "large",plotOutput("timeCourseRowNum"))
-                          )#,
-                          #tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable4'),
-                          #         bsModal("timeCoursePlot", "Expression Trajectory", "go2", size = "large",plotOutput("timeCourseRowNum"))
-                          #)
+                                    bsModal("timeCoursePlot", "Expression Trajectory", "go3", size = "large",plotOutput("timeCourseRowNum"))
+                          ),
+                          tabPanel('Transcript-level analysis', DT::dataTableOutput('mytable4'),
+                                  bsModal("timeCoursePlot_tr", "Expression Trajectory", "go4", size = "large",plotOutput("timeCourseRowNum_tr"))
+                          )
                         )
                       )
                     )
