@@ -104,7 +104,6 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
       separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
       dplyr::select(Sample, value, Id) %>%
       left_join(target) %>%
-      filter(PCW >= min & PCW <= max) %>%
       mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
       left_join(dplyr::select(mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
       mutate(facet=paste0(Id, '\nFDR=', signif(qval, digits = 3)))
