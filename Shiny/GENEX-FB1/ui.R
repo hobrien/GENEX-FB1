@@ -13,7 +13,7 @@ library(shinyBS)
 # Application title
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
 
-navbarPage("Fetal Brain Sequencing 1: Sex Differences",
+navbarPage("Fetal Brain Sequencing (FBSeq) 1: Sex Differences",
            tabPanel("Sex Differences",
                      sidebarLayout(
                        sidebarPanel(
