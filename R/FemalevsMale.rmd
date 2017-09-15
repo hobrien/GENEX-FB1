@@ -127,7 +127,7 @@ SleuthIsoform <- read_delim("../Results/SleuthPCW_RIN_annotated.txt",
                      "\t", escape_double = FALSE, trim_ws = TRUE)
 
 #select the transcript for each gene with the lowest qvalue
-SleuthTopIsoform <- SleuthIsoform %>% group_by(Id) %>% arrange(qval) %>% slice(1) %>% ungroup()
+SleuthTopIsoform <- SleuthIsoform %>% group_by(Id) %>% arrange(qval) %>% dplyr::slice(1) %>% ungroup()
 
 
 ```
@@ -546,7 +546,7 @@ gene_vs_isoform_Sleuth <- SleuthSig %>%
                         ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
                         ChrType)
         ) %>% 
-  group_by(Id) %>% slice(1) %>% ungroup() 
+  group_by(Id) %>% dplyr::slice(1) %>% ungroup() 
 
 #filter(gene_vs_isoform_Sleuth, ChrType=='autosomal') 
 ggplot(gene_vs_isoform_Sleuth, aes(x=Method, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 

@@ -181,7 +181,6 @@ if (length(exclude) > 0) {
   LibraryInfo <- dplyr::filter(LibraryInfo, !Sample == exclude)
 }
 
-LibraryInfo <- as.data.frame(LibraryInfo)
 LibraryInfo$Sex=factor(LibraryInfo$Sex)
 
 if (!is.null(male)) {
@@ -191,6 +190,7 @@ if (!is.null(male)) {
   FemaleSamples <- FemaleSamples[sample(nrow(FemaleSamples), female),]
   LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
+LibraryInfo <- as.data.frame(LibraryInfo)
 
 # loading counts
 if (opt$kallisto) {
@@ -291,7 +291,7 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, gene_type)
 
 if ( opt$feature == 'transcripts' ) {
-  gene_info <- rename(tx2gene, Id = transcript_id) %>% right_join(gene_info, by=c("gene_id" = "Id"))
+  gene_info <- dplyr::rename(tx2gene, Id = transcript_id) %>% right_join(gene_info, by=c("gene_id" = "Id"))
 }
 if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
