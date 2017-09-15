@@ -9,32 +9,33 @@ output: html_document
 knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
                       echo=FALSE, 
                       warning=FALSE, 
-                      message=FALSE,
-                      root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+                      message=FALSE)
 
 library(tidyverse)
 library(stringr)
 library(gridExtra)
 library(clusterProfiler)
 library(xlsx)
-source("Shiny/GENEX-FB1/FormatGGplot.R")
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
-fittedBias <- read_delim("Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'), 
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
          ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
          Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
 
-fittedBiasAll <- filter(fittedBias, ageBin == '12-19')
-fittedBias <-  filter(fittedBias, ageBin != '12-19')
+fittedBias_tr <- read_delim("../Shiny/GENEX-FB1/Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
+         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
+         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
 
-gene_sets <-read_delim("Data/GeneSets.txt", 
+
+gene_sets <-read_delim("../Data/GeneSets.txt", 
                          "\t", escape_double = FALSE, col_names=c('gene_name', 'set', 'reference', 'Id'), 
                          trim_ws = TRUE)
-counts <- read_delim("Shiny/GENEX-FB1/Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-target <- read_delim("Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+target <- read_delim("../Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(label=as.character(Sample))
 
 PlotFC <- function(genes, title) {
@@ -267,10 +268,11 @@ write_tsv(Enrichment, "Tables/Enrichment14.txt")
 Enrichment
 ```
 
-All weeks (65 high-cofindence Autism genes)
+## All weeks (65 high-cofindence Autism genes and 79 high confidence X-linked ID genes)
+- Sanders et al 2015, Piton et al 2013
 ```{r}
 
-disease2gene <- filter(gene_sets, set %in% c('SandersASD', 'Background'))[, c("set", "gene_name")] 
+disease2gene <- bind_rowsfilter(gene_sets, set %in% c('SandersASD', 'PitonID'))[, c("set", "gene_name")]
 
 FemaleDEG <- fittedBiasAll %>% filter(padj<0.1 & log2FoldDiff < 0)
 
@@ -296,12 +298,12 @@ Enrichment
 
 Supplementary Table 1
 ```{r}
-DEG12_19 <- fittedBiasAll %>% filter(padj<0.1) %>%
+DEG12_19 <- fittedBias %>% filter(padj<0.1) %>%
   mutate(`FoldDiff` = 2^log2FoldDiff, 
          pvalue = as.numeric(format(pvalue, digits=2)), 
          padj = as.numeric(format(padj, digits=2))) %>%
   arrange(Chr) %>%
-  dplyr::select(`Ensembl ID` = Id, 
+  dplyr::select(`Ensembl Gene ID` = Id, 
          `Gene ID` = SYMBOL,
          Chromosome = Chr,
          `Mean Count Male` = Male, 
@@ -311,36 +313,72 @@ DEG12_19 <- fittedBiasAll %>% filter(padj<0.1) %>%
          `FDR` = padj)
 
 write.xlsx2(as.data.frame(DEG12_19), 
-            file="Tables/SupplemtalTables.xlsx", 
+            file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS1')
 ```
 
 Supplementary Table 2
 ```{r}
-previous <- read_tsv("Data/previous_findings.txt")
-sig_res <- fittedBiasAll %>% 
-  bind_rows(fittedBias) %>% 
-  filter(padj < 0.1) %>%
-  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')')) %>%
-  dplyr::select(Id, SYMBOL, Chr, ageBin, result) %>%
-  spread(ageBin, result) %>% 
-  arrange(Chr) %>% 
-  dplyr::select(`Ensembl ID` = Id, 
-                `Gene ID` = SYMBOL,
-                Chromosome = Chr,
-                `12-19 PCW` = `12-19`,
-                `12 PCW` = `12`,
-                `13 PCW` = `13`,
-                `14 PCW` = `14`,
-                `15-16 PCW` = `15-16`,
-                `17-19 PCW` = `17-19`) %>%
-  left_join(previous)
+DEG12_19_tr <- fittedBias_tr %>% filter(padj<0.1) %>%
+  mutate(`FoldDiff` = 2^log2FoldDiff, 
+         pvalue = as.numeric(format(pvalue, digits=2)), 
+         padj = as.numeric(format(padj, digits=2))) %>%
+  arrange(Chr) %>%
+  dplyr::select(`Ensembl Transcript ID` = Id,
+         `Ensembl Gene ID` = GeneId,
+         `Gene ID` = SYMBOL,
+         Chromosome = Chr,
+         `Mean Count Male` = Male, 
+         `Mean Count Female` = Female,
+         `Fold Difference (M/F)` = FoldDiff,
+         `p value` = pvalue,
+         `FDR` = padj)
 
-write.xlsx2(as.data.frame(sig_res), 
-            file="Tables/SupplemtalTables.xlsx", 
+write.xlsx2(as.data.frame(DEG12_19_tr), 
+            file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS2',
+            append=TRUE)
+```
+
+# Supplementary Table 3
+- there are several issue with this table:
+    - XIST is not included as a DE gene with the gene-level analysis because it was not tested. It is in the background, so it must be because it had samples with high Cooks distance
+    - this illustrates an additional problem with the web app: genes where padj is NA are not included no matter what the slider is set to, so using the gene set downloaded from there as the background misses expressed genes that are affected by outlier samples.
+    - There is a DE gene in these lists that does not show up in the web app because it can't be associated to any Ensembl gene. It's probably best to screen these out, since we can't really say anything about them anyway.
+    - Because this analysis filters by padj before rounding while the web app filters after, there is one gene with and FDR of 0.099 which is included in these tables but not the web app.
+    - I used table S10 from the Mele paper (Genes differentially expressed between males and females (FDR <0.05)). There's also S13 (Genes differentially expressed between males and females within each tissue (FDR<0.05)), which is dominate by the breast. I haven't had a chance to looks through the paper and figure out exactly what fig S10 is.
+```{r}
+previous <- read_tsv("../Data/previous_findings.txt")
+sig_res <- fittedBias %>%
+  filter(padj < 0.1) %>%
+  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
+         level = 'Gene-level Analysis') %>%
+  dplyr::select(Id, SYMBOL, Chr, result, level)
+
+sig_res_tr <- fittedBias_tr %>%
+  arrange(padj) %>%
+  group_by(GeneId) %>%
+  dplyr::slice(1) %>%
+  filter(padj < 0.1) %>%
+  dplyr::select(-Id, Id=GeneId) %>%
+  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
+         level = 'Transcript-level Analysis') %>%
+  dplyr::select(Id, SYMBOL, Chr, result, level)
+
+sig_res_all <- bind_rows(sig_res, sig_res_tr) %>%
+  spread(level, result) %>% 
+  arrange(Chr) %>% 
+  dplyr::rename(`Ensembl ID` = Id, 
+                `Gene ID` = SYMBOL,
+                Chromosome = Chr) %>%
+  left_join(previous)
+
+write.xlsx2(as.data.frame(sig_res_all), 
+            file="../Tables/SupplementalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS3',
             append=TRUE)
 ```
 
