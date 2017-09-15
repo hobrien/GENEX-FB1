@@ -963,3 +963,40 @@ ggplot(ChrXgenes, aes(x=pos, y=log2FoldChange, colour=ChrType, shape=factor(sig)
   theme(plot.background=element_blank())
 
 ```
+
+# Overlap between DEGs and gene set members
+- all overlapping genes in the gene-level analysis are also present in the transcript-level analysis
+- does not include three genes from X-linked ID set which could not be associated with Ensembl IDs (HPRT, BRND3, DNDP)
+- need to be cautious about interpreting overlap with X-linked ID genes since chrX genes are generally female biased. I guess the appropriate background is all expressed chrX genes?
+```{r enrichment}
+fittedBias_tr <- read_tsv("../Shiny/GENEX-FB1/Data/fitted_tr.txt")
+fittedBias <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt")
+gene_sets <-read_delim("../Data/GeneSets.txt", 
+                       "\t", escape_double = FALSE, 
+                       trim_ws = TRUE)
+colnames(gene_sets) <- c('SYMBOL', 'set', 'reference', 'Id')
+disease2gene <- bind_rows(filter(gene_sets, set %in% c('SandersASD', 'PitonID'))[, c("set", "Id")],
+                          dplyr::select(fittedBias, Id) %>% mutate(set='Background'))
+
+FemaleDEG <- fittedBias %>% filter(padj<0.1 & log2FoldChange < 0) %>% 
+  dplyr::select(Id, SYMBOL) %>%
+  mutate(Direction='FemaleDEG', Analysis="Gene-Level")
+MaleDEG <- fittedBias %>% filter(padj<0.1 & log2FoldChange > 0) %>%
+  dplyr::select(Id, SYMBOL) %>%
+  mutate(Direction='MaleDEG', Analysis="Gene-Level")
+FemaleDEG_tr <- fittedBias_tr %>% filter(padj<0.1 & log2FoldChange < 0) %>% 
+  dplyr::select(Id=GeneId, SYMBOL) %>%
+  group_by(Id) %>%
+  dplyr::slice(1) %>%
+  mutate(Direction='FemaleDEG', Analysis="Transcript-Level")
+MaleDEG_tr <- fittedBias_tr %>% filter(padj<0.1 & log2FoldChange > 0) %>%
+  dplyr::select(Id=GeneId, SYMBOL) %>%
+  group_by(Id) %>%
+  dplyr::slice(1) %>%
+  mutate(Direction='MaleDEG', Analysis="Transcript-Level")
+
+bind_rows(FemaleDEG, MaleDEG, FemaleDEG_tr, MaleDEG_tr) %>%
+  inner_join(dplyr::select(gene_sets, -SYMBOL), by='Id')
+
+
+```
