@@ -135,7 +135,7 @@ normalizationMethod <- "TMM"                         # normalization method: "TM
 # DESeq parameters
 fitType <- "parametric"                              # mean-variance relationship: "parametric" (default) or "local"
 #if numeric, features with maxCooks values above this number are removed 
-cooksCutoff <-  0.75 #FALSE                          # TRUE/FALSE to perform the outliers detection (default is TRUE)
+cooksCutoff <-  FALSE #0.75                          # TRUE/FALSE to perform the outliers detection (default is TRUE)
 independentFiltering <- TRUE                         # TRUE/FALSE to perform independent filtering (default is TRUE)
 # p-value adjustment method: "BH" (default) or "BY"
 if (opt$tool == 'DESeqLRT') {
@@ -296,7 +296,7 @@ if ( opt$feature == 'transcripts' ) {
 if (opt$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
   downfile=paste0("tables/FemaleUp", ageBin, ".txt")
-  col_names <- c('Id', 'baseMean', 'Male', 'Female', 'FC', 'log2FoldChange', 'pvalue', 'padj')
+  col_names <- c('Id', 'baseMean', 'Male', 'Female', 'FC', 'log2FoldChange', 'pvalue', 'padj', 'maxCooks')
   
 } else {
   upfile=paste0("tables/Upregulated", ageBin, ".txt")
