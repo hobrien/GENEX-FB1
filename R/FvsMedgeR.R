@@ -215,6 +215,18 @@ if (opt$sex_chromosomes) {
   
   counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
 }
+if (varInt == 'PCW'){
+  if (opt$feature == 'genes') {
+    excludedFeatures <- read_delim("../Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt",
+                                   "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
+  } else if (opt$feature == 'transcripts') {
+    excludedFeatures <- read_delim("../Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt",
+                                   "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
+  }
+  counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+  independentFiltering <- FALSE
+}
+
 
 dir.create(workDir)
 setwd(workDir)
@@ -332,7 +344,7 @@ right_join(gene_info, Downregulated) %>%
 # This means that we can't use genes with padj == na to determine background
 # For DESeq, I am now extracting the filtering threshold and using it to filter the background
 Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE) 
-Complete <- Complete %>% filter(! is.na(log2FoldChange))
+Complete <- Complete %>% filter(! is.na(padj))
 
 Complete <- Complete %>% dplyr::select(one_of(col_names))
 if (opt$feature == 'junctions') {
@@ -342,7 +354,6 @@ if (opt$feature == 'junctions') {
 } else{
   Complete <- Complete %>% mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
 }
-
 right_join(gene_info, Complete) %>% 
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
