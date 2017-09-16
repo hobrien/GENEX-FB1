@@ -332,14 +332,8 @@ right_join(gene_info, Downregulated) %>%
 # This means that we can't use genes with padj == na to determine background
 # For DESeq, I am now extracting the filtering threshold and using it to filter the background
 Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete.txt$") , sep= '/'), check.names=FALSE) 
-if (opt$tool == 'EdgeR') {
-    Complete <- Complete %>% filter(! is.na(log2FoldChange))
-} else if ( testMethod=='Wald' ){
-    Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$Male_vs_Female)$filterThreshold)
-} else {
-  Complete <- Complete %>% filter(baseMean > metadata(out.DESeq2$results$drop_PCW)$filterThreshold)
-} 
-  
+Complete <- Complete %>% filter(! is.na(log2FoldChange))
+
 Complete <- Complete %>% dplyr::select(one_of(col_names))
 if (opt$feature == 'junctions') {
   Complete <- Complete %>% mutate(originalId=Id) %>%
