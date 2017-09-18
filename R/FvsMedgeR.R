@@ -213,7 +213,14 @@ if (opt$sex_chromosomes) {
     filter(seqid == 'chrX' | seqid == 'chrY') %>% 
     dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
   
-  counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+  if (opt$kallisto) {
+    counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
+    counts$length <- counts$length[!rownames(counts$length) %in% excludedFeatures$Id, ]
+    counts$abundance <- counts$abundance[!rownames(counts$abundance) %in% excludedFeatures$Id, ]
+    counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
+  } else {  
+    counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+  }
 }
 if (varInt == 'PCW'){
   if (opt$feature == 'genes') {
@@ -223,7 +230,14 @@ if (varInt == 'PCW'){
     excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt",
                                    "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
   }
-  counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+  if (opt$kallisto) {
+    counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
+    counts$length <- counts$length[!rownames(counts$length) %in% excludedFeatures$Id, ]
+    counts$abundance <- counts$abundance[!rownames(counts$abundance) %in% excludedFeatures$Id, ]
+    counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
+  } else {  
+    counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
+  }
   independentFiltering <- FALSE
 }
 
