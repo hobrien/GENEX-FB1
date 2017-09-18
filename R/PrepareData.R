@@ -14,9 +14,9 @@ mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
                          dataset = "hsapiens_gene_ensembl",
                          host = 'ensembl.org')
 t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
-                                     "external_gene_name", "chromosome_name"), mart = mart)
+                                     "external_gene_name", "chromosome_name", "gene_biotype"), mart = mart)
 t2g <- dplyr::rename(t2g, Id = ensembl_transcript_id,
-                     GeneId = ensembl_gene_id, SYMBOL = external_gene_name, Chr=chromosome_name)
+                     GeneId = ensembl_gene_id, SYMBOL = external_gene_name, Chr=chromosome_name, gene_type=gene_biotype)
 t2g <- dplyr::mutate(t2g, Chr = paste0('chr', Chr), ChrType = ifelse(Chr == 'chrX' | Chr == 'chrY', Chr, 'autosomal')
   )
 
@@ -26,6 +26,7 @@ gene_info <- t2g %>%
   dplyr::slice(1) %>%
   dplyr::rename(Id=GeneId)
 
+rename(gene_info, gene_id=Id, gene_name=SYMBOL, seqid=Chr) %>% write_tsv("Data/genes.txt")
 # Results of gene level analyses
 counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(Id=str_extract(Id, '^[^.]+'))
