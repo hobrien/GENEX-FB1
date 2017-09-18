@@ -217,10 +217,10 @@ if (opt$sex_chromosomes) {
 }
 if (varInt == 'PCW'){
   if (opt$feature == 'genes') {
-    excludedFeatures <- read_delim("../Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt",
+    excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt",
                                    "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
   } else if (opt$feature == 'transcripts') {
-    excludedFeatures <- read_delim("../Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt",
+    excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt",
                                    "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
   }
   counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
