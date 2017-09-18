@@ -327,7 +327,7 @@ if (opt$varInt == 'Sex') {
 } else {
   upfile=paste0("tables/Upregulated", ageBin, ".txt")
   downfile=paste0("tables/Downregulated", ageBin, ".txt")
-  col_names <- c('Id', 'baseMean', 'FC', 'log2FoldChange', 'pvalue', 'padj')
+  col_names <- c('Id', 'baseMean', 'FC', 'log2FoldChange', 'pvalue', 'padj', 'maxCooks')
 }
 
 Upregulated <- read.delim(paste('tables', list.files('tables', pattern = ".up.txt$") , sep= '/'), check.names=FALSE)  %>% 
