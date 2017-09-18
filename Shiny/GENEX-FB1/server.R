@@ -111,6 +111,7 @@ filter_table <- function(fitted, ChrTypeList, Bias, p_type, p_val) {
   } else if (Bias == 'FemaleUp') {
     fitted <- fitted %>% filter(log2FoldDiff < 0)
   }
+  fitted <- mutate(fitted, pvalue = as.numeric(format(pvalue, digits=3)), padj = as.numeric(format(padj, digits=3)))
   fitted
 }
 
@@ -133,23 +134,19 @@ target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols
 counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
 fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
   arrange(padj)
 
 fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
   arrange(padj)
 
 counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
 fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange)
 
 fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(pvalue = as.numeric(format(pvalue, digits=2)), padj = as.numeric(format(padj, digits=2))) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange)
 
 ################################## Run server ##################################
