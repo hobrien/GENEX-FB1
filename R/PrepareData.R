@@ -33,8 +33,7 @@ counts12_20 <-right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('
 write_tsv(counts12_20, "Shiny/GENEX-FB1/Data/counts12_20.txt")
 
 fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-  mutate(ageBin='12-19')
+  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj)
 fittedBias <- right_join(gene_info, fittedBias)
 write_tsv(fittedBias, "Shiny/GENEX-FB1/Data/fitted.txt")
 
@@ -47,8 +46,7 @@ write_tsv(fittedPCW, "Shiny/GENEX-FB1/Data/dropPCW.txt")
 # Results of transcript level analyses
 
 fittedBias_tr <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) %>% 
-  mutate(ageBin='12-19')
+  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) 
 fittedBias_tr <- right_join(t2g, fittedBias_tr) 
 write_tsv(fittedBias_tr, "Shiny/GENEX-FB1/Data/fitted_tr.txt")
 
