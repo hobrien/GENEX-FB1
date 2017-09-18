@@ -102,7 +102,7 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
 #PlotTranscriptsRowNum(counts_tr , filter(fitted_tr, Id=='ENST00000359939'), fitted_tr, target)
 
 filter_table <- function(fitted, ChrTypeList, Bias, p_type, p_val) {
-  fitted <- filter(fitted, !is.na(padj) & UQ(as.name(p_type)) < p_val ) %>%
+  fitted <- filter(fitted, !is.na(padj) & UQ(as.name(p_type)) <= p_val ) %>%
     arrange(UQ(as.name(p_type))) %>%
     filter(ChrType %in% ChrTypeList | is.na(ChrType)) %>% 
     dplyr::select(-ChrType)
