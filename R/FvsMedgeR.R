@@ -178,7 +178,7 @@ if (!is.null(PCW_cutoff)) {
 }
 
 if (length(exclude) > 0) {
-  LibraryInfo <- dplyr::filter(LibraryInfo, !Sample == exclude)
+  LibraryInfo <- dplyr::filter(LibraryInfo, !Sample %in% exclude)
 }
 
 LibraryInfo$Sex=factor(LibraryInfo$Sex)
