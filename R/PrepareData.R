@@ -1,6 +1,7 @@
 library(tidyverse)
 library(stringr)
 library(biomaRt)
+library(yaml)
 
 # Oh yes, thought of a catchy (and hopefully memorable) name for the dataset: 
 # GENEX-FB (for GENe EXpression in the Fetal Brain). 
@@ -33,6 +34,19 @@ counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/ta
   mutate(Id=str_extract(Id, '^[^.]+'))
 counts12_20 <-right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('norm')))
 
+counts12_20<-as.data.frame(counts12_20)
+rownames(counts12_20)<-counts12_20$Id
+
+outliers <- yaml.load_file("config.yaml")
+Ids <-c()
+SampleIds<-c()
+for (samples in names(outliers$gene_level)) {
+  for (SampleId in str_split(samples, '_')[[1]]) {
+    for (Id in str_split(outliers$gene_level[[samples]], '_')[[1]]) {
+      counts12_20[Id, paste('norm', SampleId, sep='.')] <- NA
+    }
+  }
+}
 
 write_tsv(counts12_20, "Shiny/GENEX-FB1/Data/counts12_20.txt")
 
@@ -66,6 +80,16 @@ counts12_20_tr <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_ka
   mutate(Id=str_extract(Id, '^[^.]+'))
 counts12_20_tr <- right_join(t2g, dplyr::select(counts12_20_tr, Id, starts_with('norm')))
 
+counts12_20<-as.data.frame(counts12_20)
+rownames(counts12_20)<-counts12_20$Id
+
+for (samples in names(outliers$transcript_level)) {
+  for (SampleId in str_split(samples, '_')[[1]]) {
+    for (Id in str_split(outliers$transcript_level[[samples]], '_')[[1]]) {
+      counts12_20_tr[Id, paste('norm', SampleId, sep='.')] <- NA
+    }
+  }
+}
 
 write_tsv(counts12_20_tr, "Shiny/GENEX-FB1/Data/counts12_20_tr.txt")
 
