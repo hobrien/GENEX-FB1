@@ -24,42 +24,49 @@ gene_info <- t2g %>%
   dplyr::select(-Id) %>% 
   group_by(GeneId) %>% 
   dplyr::slice(1) %>%
+  ungroup() %>%
   dplyr::rename(Id=GeneId)
 
-rename(gene_info, gene_id=Id, gene_name=SYMBOL, seqid=Chr) %>% write_tsv("Data/genes.txt")
+dplyr::rename(gene_info, gene_id=Id, gene_name=SYMBOL, seqid=Chr) %>% write_tsv("Data/genes.txt")
 # Results of gene level analyses
 counts12_20 <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(Id=str_extract(Id, '^[^.]+'))
 counts12_20 <-right_join(gene_info, dplyr::select(counts12_20, Id, starts_with('norm')))
+
+
 write_tsv(counts12_20, "Shiny/GENEX-FB1/Data/counts12_20.txt")
 
 fittedBias <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj)
+  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj, maxCooks) %>%
+  mutate(pvalue= ifelse(maxCooks>10, 1, pvalue), padj= ifelse(maxCooks>10, 1, padj))
 fittedBias <- right_join(gene_info, fittedBias)
 write_tsv(fittedBias, "Shiny/GENEX-FB1/Data/fitted.txt")
 
 fittedPCW <- read_tsv("Results/PCW_Sex_12_20_FDR_0.1_DESeqLRT_kallistoCounts/tables/BG12_20.txt") %>%
-  dplyr::select(Id, baseMean, log2FoldChange, pvalue, padj) %>%
-  mutate(Id = sub("\\.[0-9]+", "", Id))
+  dplyr::select(Id, baseMean, log2FoldChange, pvalue, padj, maxCooks) %>%
+  mutate(pvalue= ifelse(maxCooks>10, 1, pvalue), padj= ifelse(maxCooks>10, 1, padj))
 fittedPCW <- right_join(gene_info, fittedPCW)
 write_tsv(fittedPCW, "Shiny/GENEX-FB1/Data/dropPCW.txt")
 
 # Results of transcript level analyses
 
 fittedBias_tr <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj) 
+  dplyr::select(Id, Male, Female, log2FoldChange, pvalue, padj, maxCooks) %>%
+  mutate(pvalue= ifelse(maxCooks>10, 1, pvalue), padj= ifelse(maxCooks>10, 1, padj)) 
 fittedBias_tr <- right_join(t2g, fittedBias_tr) 
 write_tsv(fittedBias_tr, "Shiny/GENEX-FB1/Data/fitted_tr.txt")
 
 fittedPCW_tr <- read_tsv("Results/PCW_Sex_12_20_FDR_0.1_DESeqLRT_transcripts_kallistoCounts/tables/BG12_20.txt") %>%
-  dplyr::select(Id, baseMean, log2FoldChange, pvalue, padj) %>%
-  mutate(Id = sub("\\.[0-9]+", "", Id))
+  dplyr::select(Id, baseMean, log2FoldChange, pvalue, padj, maxCooks) %>%
+  mutate(pvalue= ifelse(maxCooks>10, 1, pvalue), padj= ifelse(maxCooks>10, 1, padj))
 fittedPCW_tr <- right_join(t2g, fittedPCW_tr) 
 write_tsv(fittedPCW_tr, "Shiny/GENEX-FB1/Data/dropPCW_tr.txt")
 
 counts12_20_tr <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   mutate(Id=str_extract(Id, '^[^.]+'))
 counts12_20_tr <- right_join(t2g, dplyr::select(counts12_20_tr, Id, starts_with('norm')))
+
+
 write_tsv(counts12_20_tr, "Shiny/GENEX-FB1/Data/counts12_20_tr.txt")
 
 

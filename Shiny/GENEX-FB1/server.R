@@ -136,12 +136,12 @@ counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, tri
 
 fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
-  dplyr::select(-gene_type) %>%
+  dplyr::select(-gene_type, -maxCooks) %>%
   arrange(padj)
 
 fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
-  dplyr::select(-gene_type) %>%
+  dplyr::select(-gene_type, -maxCooks) %>%
   arrange(padj)
 
 counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
@@ -150,11 +150,11 @@ counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALS
   
 fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  dplyr::select(-gene_type)
+  dplyr::select(-gene_type, -maxCooks)
   
 fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  dplyr::select(-gene_type)
+  dplyr::select(-gene_type, -maxCooks)
   
 
 ################################## Run server ##################################
