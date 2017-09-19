@@ -41,7 +41,7 @@ PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
     ggtitle(title) 
   plot
 }
-#PlotExpressionRowNum(20, counts_tr, fittedPCW_tr, target)
+#PlotExpressionRowNum(9337, counts, fittedPCW, target) + scale_y_continuous(limits=c(0,10))
 
 PlotTimepointRowNum<-function(row_num, counts, fitted, target) {
   selection <- fitted[row_num,]
@@ -131,23 +131,31 @@ add_links_tr <-function(fitted) {
 ################################## Load Data ##################################
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
-counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  dplyr::select(-gene_type)
 
 fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
+  dplyr::select(-gene_type) %>%
   arrange(padj)
 
 fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
+  dplyr::select(-gene_type) %>%
   arrange(padj)
 
-counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
-
+counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  dplyr::select(-gene_type)
+  
+  
 fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
-
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
+  dplyr::select(-gene_type)
+  
 fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange)
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
+  dplyr::select(-gene_type)
+  
 
 ################################## Run server ##################################
 shinyServer(function(session, input, output) {
