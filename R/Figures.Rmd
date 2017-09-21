@@ -87,40 +87,45 @@ Fig1
 Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
 ``` {r}
 txdb <- EnsDb.Hsapiens.v86
-ANOS1_tr <- exonsBy(txdb, filter=GeneIdFilter('ENSG00000011201'))
-p1 <- autoplot(ANOS1_tr, group.selfish = TRUE)
-p2 <- autoplot(txdb, which = GeneIdFilter('ENSG00000011201'), stat="reduce")
-gene_models <- tracks(transcripts = p1, gene = p2, heights = c(3,1))
-pdf("Fig2A.pdf")
-gene_models
-dev.off()
+KDM2B_tr1 <- exonsBy(txdb, filter=TxIdFilter('ENST00000538046')) 
+p1 <- autoplot(KDM2B_tr1, group.selfish = TRUE, names='')
+KDM2B_tr2 <- exonsBy(txdb, filter=TxIdFilter('ENST00000611216')) 
+p2 <- autoplot(KDM2B_tr2, group.selfish = TRUE)
+p3 <- autoplot(txdb, which = GeneIdFilter('ENSG00000089094'), stat="reduce")
+gene_models <- tracks(ENST00000538046 = p1, ENST00000611216=p2, gene = p3)
+#pdf("Fig2A.pdf")
+gene_models+main_theme()
+ggsave("../Figures/Fig2A.pdf")
+#dev.off()
 
 
-ANOS1mean <- filter(fittedBias_tr, GeneId == 'ENSG00000011201') %>%
-  bind_rows(filter(fittedBias, Id == 'ENSG00000011201')) %>%
+KDM2Bmean <- filter(fittedBias_tr, Id %in% c('ENST00000611216', 'ENST00000538046')) %>%
+  bind_rows(filter(fittedBias, Id == 'ENSG00000089094')) %>%
   dplyr::select(Male, Female, Id, qval=padj) %>%
   gather('Sex', 'mean', -Id, -qval) %>%
-  mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3))), Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
-ANOS1mean$facet<-factor(ANOS1mean$facet, levels=rev(levels(ANOS1mean$facet)))
+  mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3))))
+
+KDM2Bmean$facet<-factor(KDM2Bmean$facet, levels=c(levels(KDM2Bmean$facet)[2], levels(KDM2Bmean$facet)[3], levels(KDM2Bmean$facet)[1]))
 
   
-ANOS1counts <- filter(counts_tr, GeneId == 'ENSG00000011201') %>%
-  bind_rows(filter(counts, Id=='ENSG00000011201')) %>%
-      dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
-      gather(key, value, -Id, -gene_type) %>%
-      separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-      dplyr::select(Sample, value, Id) %>%
-      left_join(sample_info) %>%
-      mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
-      left_join(dplyr::select(ANOS1mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
-      mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3))))
-ANOS1counts$facet<-factor(ANOS1counts$facet, levels=rev(levels(ANOS1counts$facet)))
+KDM2Bcounts <- filter(counts_tr, Id %in% c('ENST00000611216', 'ENST00000538046')) %>%
+  bind_rows(filter(counts, Id=='ENSG00000089094')) %>%
+  dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
+  gather(key, value, -Id, -gene_type) %>%
+  separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+  dplyr::select(Sample, value, Id) %>%
+  left_join(sample_info) %>%
+  left_join(dplyr::select(KDM2Bmean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
+  mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3)))) %>%
+  filter(Sample != '16115' | Id != 'ENST00000538046') # filter count outlier
 
-ggplot(ANOS1counts, aes(x=Sex, colour=Sex)) + 
+KDM2Bcounts$facet<-factor(KDM2Bcounts$facet, levels=c(levels(KDM2Bcounts$facet)[2], levels(KDM2Bcounts$facet)[3], levels(KDM2Bcounts$facet)[1]))
+
+ggplot(KDM2Bcounts, aes(x=Sex, colour=Sex)) + 
+    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=.5, width=.5, data=KDM2Bmean) +
     geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75, size=1) + 
-    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=ANOS1mean) +
     facet_grid(facet ~ ., scales="free") +
-    ylab("normalised counts") +
+    ylab("Normalized Counts") +
     xlab('') +
     main_theme() +
     scale_y_continuous(position = "right") +
@@ -130,9 +135,9 @@ ggplot(ANOS1counts, aes(x=Sex, colour=Sex)) +
       strip.text = element_blank()
     )
 ggsave("../Figures/Fig2B.pdf")
-pdf("../Figures/Fig2B.pdf")
-ANOS1expression
-dev.off()
+#pdf("../Figures/Fig2B.pdf")
+#ANOS1expression
+#dev.off()
 
 ```
 
@@ -317,7 +322,7 @@ write.xlsx2(as.data.frame(DEG12_19),
 
 Supplementary Table 3: Transcripts with significant sex Biases (FDR<0.1)
 ```{r}
-DEG12_19_tr <- fittedBias_tr %>% filter(padj<0.1) %>%
+DEG12_19_tr <- fittedBias_tr %>% filter(padj<0.1 & !is.na(Chr)) %>%
   mutate(`FoldDiff` = 2^log2FoldDiff, 
          pvalue = as.numeric(format(pvalue, digits=2)), 
          padj = as.numeric(format(padj, digits=2))) %>%
@@ -346,16 +351,16 @@ write.xlsx2(as.data.frame(DEG12_19_tr),
 ```{r}
 previous <- read_tsv("../Data/previous_findings.txt")
 sig_res <- fittedBias %>%
-  filter(padj < 0.1) %>%
+  filter(padj < 0.1 & !is.na(Chr)) %>%
   mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
          level = 'Gene-level Analysis') %>%
   dplyr::select(Id, SYMBOL, Chr, result, level)
 
 sig_res_tr <- fittedBias_tr %>%
+  filter(padj < 0.1 & !is.na(Chr)) %>%
   arrange(padj) %>%
   group_by(GeneId) %>%
   dplyr::slice(1) %>%
-  filter(padj < 0.1) %>%
   dplyr::select(-Id, Id=GeneId) %>%
   mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
          level = 'Transcript-level Analysis') %>%
@@ -363,6 +368,7 @@ sig_res_tr <- fittedBias_tr %>%
 
 sig_res_all <- bind_rows(sig_res, sig_res_tr) %>%
   spread(level, result) %>% 
+  mutate(Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) %>%
   arrange(Chr) %>% 
   dplyr::rename(`Ensembl ID` = Id, 
                 `Gene ID` = SYMBOL,
@@ -372,7 +378,7 @@ sig_res_all <- bind_rows(sig_res, sig_res_tr) %>%
 write.xlsx2(as.data.frame(sig_res_all), 
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
-            sheetName='TblS3',
+            sheetName='TblS4',
             append=TRUE)
 ```
 
