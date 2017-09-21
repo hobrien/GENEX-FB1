@@ -13,152 +13,127 @@ knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
 
 library(tidyverse)
 library(stringr)
-library(gridExtra)
-library(clusterProfiler)
+#library(gridExtra)
+#library(clusterProfiler)
 library(xlsx)
+library(EnsDb.Hsapiens.v86)
+library(ggbio)
+library(AnnotationFilter)
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
+
+gene_info <- read_delim("../Data/genes.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+sample_info <- read_delim("../Data/SampleInfo.txt", "\t", col_types=cols(Sample='c'), escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(label=as.character(Sample))
+
 
 fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
-         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
-
+         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome')) 
+counts <- read_delim("../Shiny/GENEX-FB1/Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+counts_tr <- read_delim("../Shiny/GENEX-FB1/Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 fittedBias_tr <- read_delim("../Shiny/GENEX-FB1/Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'), 
-         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) 
+         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'))
 
+fittedBias_topIsoform <- fittedBias_tr %>% group_by(GeneId) %>% arrange(padj) %>% dplyr::slice(1) %>% ungroup()
 
-gene_sets <-read_delim("../Data/GeneSets.txt", 
-                         "\t", escape_double = FALSE, col_names=c('gene_name', 'set', 'reference', 'Id'), 
-                         trim_ws = TRUE)
-
-target <- read_delim("../Data/SampleInfo.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  mutate(label=as.character(Sample))
-
-PlotFC <- function(genes, title) {
-  plot <- ggplot(genes, aes(x=ageBin, y=log2FoldDiff, group=Id)) +
-    geom_line(alpha=.1) +
-    geom_point(colour='red', size=1, alpha=.25, data=filter(genes, padj<0.1)) +
-    figure_theme() +
-    ylab("<--- Female-biased        Male-biased --->") +
-    xlab("Post-conception week") +
-    theme(axis.title.y=element_text(size=9)) +
-    ggtitle(title)
-  plot        
-}
+DEgenes <- filter(fittedBias, padj<=.1) %>% dplyr::select(Id)
+DEtranscripts <- filter(fittedBias_topIsoform, padj<=.1 & !is.na(GeneId)) %>% dplyr::select(Id=GeneId) 
+DEall <- inner_join(DEgenes, DEtranscripts) %>% 
+  mutate(level='both') %>%
+  full_join(DEgenes) %>%
+  mutate(level=ifelse(is.na(level), 'gene-level', level)) %>%
+  full_join(DEtranscripts) %>%
+  mutate(level=ifelse(is.na(level), 'transcript-level', level)) %>%
+  inner_join(gene_info, by=c('Id' = 'gene_id')) %>%
+  left_join(dplyr::select(fittedBias, Id, gene_padj=padj)) %>%
+  left_join(dplyr::select(fittedBias_topIsoform, Id=GeneId, transcript_padj=padj, Sex))
 ```
 
 
-Figure 1. a) Number of genes exhibiting sex-biased expression at FDR < 0.1 at each developmental time-point. b) Mean Log2-fold sex differences in all detected genes at each developmental time-point. Black dots indicate significant sex biases (FDR < 0.1). Multiple genes on the Y-chromosome are expressed in males across all time-points; the X-chromosome gene displaying pronounced differences across all time-points is XIST. Numbers of males (M) and females (F) included at each time-point are: 12 PCW = 10 M and 6 F; 13 PCW = 17 M and 14 F; 14 PCW = 8 M and 10 F; 15–16 PCW = 15 M and 8 F; 17-19 PCW = 12 M and 8 F.
+Figure 1.
 
 ```{r}
-Fig1a <- fittedBias %>% filter(padj < .1 ) %>%
-  ggplot(aes(x=Sex, fill=ChrType)) + geom_bar(position='stack') + 
-  facet_grid(. ~ ageBin) +
+PARgenes <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/PARgenes.txt",
+"\t", escape_double = FALSE, trim_ws = TRUE)
+
+DEall <- left_join(DEall, dplyr::select(PARgenes, gene_name=`Approved Symbol`, PAR=Unknown)) %>%
+  mutate(ChrType=ifelse(is.na(PAR), ChrType, 'PAR'))
+Fig1 <- ggplot(DEall, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+  facet_grid(~ level) +
     figure_theme() +
     #scale_y_continuous(breaks=seq(100,1000,100)) +
-    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
     theme(strip.switch.pad.grid = unit(10, 'cm')) +
     ylab('Number sex-biased genes (FDR<0.1)') +
     xlab('Fetal sex') +
     theme(axis.title.y=element_text(size=9)) +
     theme(axis.title.x=element_text(size=9)) +
-    ggtitle('A.')
-
-Fig1b <- ggplot(fittedBias, aes(x=ageBin, y=log2FoldDiff, group=Id)) + 
-    geom_line(alpha=1, aes(colour=ChrType)) +
-    geom_point(colour='black', size=1, alpha=.25, data=filter(fittedBias, padj < .1 )) +
-    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) + 
-    figure_theme() +
-    ylab("<--- Female-biased        Male-biased --->") +
-    xlab("Post-conception week") +
-    theme(axis.title.y=element_text(size=9)) +
-    theme(axis.title.x=element_text(size=9)) +
-    ggtitle('B.') +
-    theme(legend.position='right')
-
-
-png(file="Figures/Fig1.png", bg="transparent", width=183, height=70, units='mm', res=300)
-grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+png(file="../Figures/Fig1.png", bg="transparent", width=183, 
+    height=70, units='mm', res=300)
+Fig1
 dev.off()
-pdf(file="Figures/Fig1.pdf", 7.2, 3)
-grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
+pdf(file="../Figures/Fig1.pdf", 7.2, 3)
+Fig1
 dev.off()
-
-grid.arrange(Fig1a, Fig1b, ncol=2, widths=c(1,2))
-
+Fig1
 ```
 
 Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
 ``` {r}
-AN <- gene_sets %>% 
-  filter(set=='cluster7' & gene_name != 'XIST') %>% 
-  inner_join(fittedBias)
-
-group_by(AN, ageBin) %>% summarise(n=n())
-FR <- gene_sets %>% 
-  filter(set=='cluster9' & gene_name != 'RPS4Y1') %>%
-  inner_join(fittedBias)
-group_by(FR, ageBin) %>% summarise(n=n())
-png(file="Figures/Fig2.png", bg="transparent", width=183, 
-    height=70, units='mm', res=300)
-grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
-dev.off()
-pdf(file="Figures/Fig2.pdf", 7.2, 3)
-grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
+txdb <- EnsDb.Hsapiens.v86
+ANOS1_tr <- exonsBy(txdb, filter=GeneIdFilter('ENSG00000011201'))
+p1 <- autoplot(ANOS1_tr, group.selfish = TRUE)
+p2 <- autoplot(txdb, which = GeneIdFilter('ENSG00000011201'), stat="reduce")
+gene_models <- tracks(transcripts = p1, gene = p2, heights = c(3,1))
+pdf("Fig2A.pdf")
+gene_models
 dev.off()
 
-grid.arrange(PlotFC(FR, 'A.'), PlotFC(AN, 'B.'), ncol=2)
 
-```
+ANOS1mean <- filter(fittedBias_tr, GeneId == 'ENSG00000011201') %>%
+  bind_rows(filter(fittedBias, Id == 'ENSG00000011201')) %>%
+  dplyr::select(Male, Female, Id, qval=padj) %>%
+  gather('Sex', 'mean', -Id, -qval) %>%
+  mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3))), Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+ANOS1mean$facet<-factor(ANOS1mean$facet, levels=rev(levels(ANOS1mean$facet)))
 
-Figure 3: Expression data for selected genes characteristic of mature neurons (GABRA1, GRIN2A) and proliferating neural progenitor cells (NES, EOMES) in 14 PCW brain samples (8 male, 10 female).
-```{r}
-PlotTimepoint<-function(geneID, counts, fittedBias, target, ages, title) {
-  geneID = str_replace(geneID, '(ENSG\\d+)\\.\\d+', '\\1')
-  ageSplit <- strsplit(ages, '-')[[1]]
-  min <- ageSplit[1]
-  max <- ageSplit[length(ageSplit)]
-  data <- counts %>% filter(SYMBOL == geneID | Id == geneID) %>%  
-    dplyr::select(-SYMBOL, -Id, -Chr) %>%
-    gather() %>%
-    separate(key, into=c('norm', 'label'), sep='[.]') %>%
-    dplyr::select(label, value) %>%
-    left_join(target) %>%
-    filter(PCW >= min & PCW <= max)
-  mean <- filter(fittedBias, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
-  fc <- mean$log2FoldDiff[1] %>% format(digits=2)
-  pval <- mean$pvalue[1]
-  qval <- mean$padj[1]
-  mean <- mean %>% dplyr::select(Male, Female) %>%
-    gather('Sex', 'mean')
-  plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
-    geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75) + 
-    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
-    ylab("Normalised counts") +
+  
+ANOS1counts <- filter(counts_tr, GeneId == 'ENSG00000011201') %>%
+  bind_rows(filter(counts, Id=='ENSG00000011201')) %>%
+      dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
+      gather(key, value, -Id, -gene_type) %>%
+      separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+      dplyr::select(Sample, value, Id) %>%
+      left_join(sample_info) %>%
+      mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
+      left_join(dplyr::select(ANOS1mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
+      mutate(facet=factor(paste0(Id, '\nFDR=', signif(qval, digits = 3))))
+ANOS1counts$facet<-factor(ANOS1counts$facet, levels=rev(levels(ANOS1counts$facet)))
+
+ggplot(ANOS1counts, aes(x=Sex, colour=Sex)) + 
+    geom_jitter(aes(y=value), height = 0, width=.1, alpha=.75, size=1) + 
+    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=ANOS1mean) +
+    facet_grid(facet ~ ., scales="free") +
+    ylab("normalised counts") +
     xlab('') +
-    figure_theme() +
+    main_theme() +
+    scale_y_continuous(position = "right") +
     scale_colour_brewer(type = "qual", palette = 6) +
-     theme(plot.title=element_text(face="italic")) +
-    ggtitle(title) 
-  plot
-}
-
-Fig3a <- PlotTimepoint('GABRA1', counts, fittedBias, target, '14', 'GABRA1')
-Fig3b <- PlotTimepoint('GRIN2A', counts, fittedBias, target, '14', 'GRIN2A')
-Fig3c <- PlotTimepoint('NES', counts, fittedBias, target, '14', 'NES')
-Fig3d <- PlotTimepoint('EOMES', counts, fittedBias, target, '14', 'EOMES')
-png(file="Figures/Fig3.png", bg="transparent", width=183, height=140, units='mm', res=300)
-grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
-dev.off()
-pdf(file="Figures/Fig3.pdf", 7.2, 5.5)
-grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
+    theme(
+      strip.background = element_blank(),
+      strip.text = element_blank()
+    )
+ggsave("../Figures/Fig2B.pdf")
+pdf("../Figures/Fig2B.pdf")
+ANOS1expression
 dev.off()
 
-grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
 ```
 
 Figure S1
@@ -296,12 +271,32 @@ write_tsv(Enrichment, "Tables/EnrichmentAll.txt")
 Enrichment
 ```
 
-Supplementary Table 1
+Supplementary Table 1: Sampling info
 ```{r}
-DEG12_19 <- fittedBias %>% filter(padj<0.1) %>%
+TotalFragments <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Tables/CountSummary.txt",
+"\t", escape_double = FALSE, col_types = cols(Sample = col_character()),
+trim_ws = TRUE) %>% dplyr::select(Sample, TotalFragments)
+
+SampleInfo <- read_tsv("../Data/SampleInfo.txt", col_types = cols(Sample = col_character())) %>%
+  full_join(TotalFragments) %>%
+  mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
+  dplyr::select(-TotalFragments)
+
+write.xlsx2(as.data.frame(SampleInfo), 
+            file="../Tables/SupplementalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS1',
+            append=FALSE)
+
+```
+
+Supplementary Table 2: Genes with significant sex Biases (FDR<0.1)
+```{r}
+DEG12_19 <- fittedBias %>% filter(padj<0.1 & !is.na(Chr)) %>%
   mutate(`FoldDiff` = 2^log2FoldDiff, 
          pvalue = as.numeric(format(pvalue, digits=2)), 
          padj = as.numeric(format(padj, digits=2))) %>%
+  mutate(Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) %>%
   arrange(Chr) %>%
   dplyr::select(`Ensembl Gene ID` = Id, 
          `Gene ID` = SYMBOL,
@@ -315,15 +310,18 @@ DEG12_19 <- fittedBias %>% filter(padj<0.1) %>%
 write.xlsx2(as.data.frame(DEG12_19), 
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
-            sheetName='TblS1')
+            sheetName='TblS2',
+            append=TRUE)
 ```
 
-Supplementary Table 2
+
+Supplementary Table 3: Transcripts with significant sex Biases (FDR<0.1)
 ```{r}
 DEG12_19_tr <- fittedBias_tr %>% filter(padj<0.1) %>%
   mutate(`FoldDiff` = 2^log2FoldDiff, 
          pvalue = as.numeric(format(pvalue, digits=2)), 
          padj = as.numeric(format(padj, digits=2))) %>%
+  mutate(Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) %>%
   arrange(Chr) %>%
   dplyr::select(`Ensembl Transcript ID` = Id,
          `Ensembl Gene ID` = GeneId,
@@ -338,17 +336,13 @@ DEG12_19_tr <- fittedBias_tr %>% filter(padj<0.1) %>%
 write.xlsx2(as.data.frame(DEG12_19_tr), 
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
-            sheetName='TblS2',
+            sheetName='TblS3',
             append=TRUE)
 ```
 
-# Supplementary Table 3
-- there are several issue with this table:
-    - XIST is not included as a DE gene with the gene-level analysis because it was not tested. It is in the background, so it must be because it had samples with high Cooks distance
-    - this illustrates an additional problem with the web app: genes where padj is NA are not included no matter what the slider is set to, so using the gene set downloaded from there as the background misses expressed genes that are affected by outlier samples.
-    - There is a DE gene in these lists that does not show up in the web app because it can't be associated to any Ensembl gene. It's probably best to screen these out, since we can't really say anything about them anyway.
-    - Because this analysis filters by padj before rounding while the web app filters after, there is one gene with and FDR of 0.099 which is included in these tables but not the web app.
-    - I used table S10 from the Mele paper (Genes differentially expressed between males and females (FDR <0.05)). There's also S13 (Genes differentially expressed between males and females within each tissue (FDR<0.05)), which is dominate by the breast. I haven't had a chance to looks through the paper and figure out exactly what fig S10 is.
+# Supplementary Table 4: Comparison with previous findings
+- transcript-level analysis = isoform with the lowset p-value
+
 ```{r}
 previous <- read_tsv("../Data/previous_findings.txt")
 sig_res <- fittedBias %>%
@@ -531,15 +525,3 @@ write.xlsx2(as.data.frame(GO_F_14),
 
 ```
 
-Supplementary Table 13
-```{r}
-SampleInfo <- read_tsv("Data/SampleInfo.txt") %>%
-  mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
-  dplyr::select(-TotalFragments)
-write.xlsx2(as.data.frame(SampleInfo), 
-            file="Tables/SupplemtalTables.xlsx", 
-            row.names=FALSE,
-            sheetName='TblS13',
-            append=TRUE)
-
-```
