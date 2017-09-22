@@ -84,7 +84,7 @@ dev.off()
 Fig1
 ```
 
-Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
+Figure 2: 
 ``` {r}
 ensdb <- EnsDb.Hsapiens.v86
 #KDM2B_tr1 <- exonsBy(ensdb, filter=TxIdFilter('ENST00000538046')) 
@@ -152,31 +152,37 @@ ggsave("../Figures/Fig2B.pdf")
 
 ```
 
-Figure S1
+Figure 3:
 
 ```{r}
-common <- DEall %>% group_by(gene_type) %>% 
-  dplyr::summarise(n=n()) %>% 
-  filter(n>10) %>% 
-  semi_join(DEall, .) %>% 
-  group_by(ChrType, gene_type, level) %>% 
-  dplyr::summarise(n=n()) 
 
-other <- DEall %>% group_by(gene_type) %>% 
-  dplyr::summarise(n=n()) %>% 
-  filter(n>10) %>% 
-  anti_join(DEall, .) %>%
-  group_by(ChrType, level) %>% 
-  dplyr::summarise(n=n()) %>%
-  mutate(gene_type='other')
+fittedBias <- fittedBias %>% filter(!is.na(gene_type)) %>%
+  mutate(gene_type = ifelse(gene_type %in% c("antisense_RNA", "lincRNA", "protein_coding", "miRNA"),
+                            gene_type, 
+                            ifelse(gene_type %in% c("snRNA", "snoRNA"),
+                                   "snRNA/snoRNA",
+                                   ifelse(str_detect(gene_type, "pseudogene"), 
+                                          "pseudogene", 
+                                          "other"))))
 
-rank <-common %>% group_by(gene_type) %>% dplyr::summarise(freq=sum(n)) %>% arrange(desc(freq))
+fittedBias %>% filter(padj<.1 & ChrType == 'autosome') %>%
+  group_by(gene_type) %>% 
+  summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(padj<.1 & ChrType == 'autosome'))), DE='SexBiased') %>%
+  bind_rows(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome') %>%
+              group_by(gene_type) %>% 
+              summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome'))), DE='Background')) %>%
+  ggplot(aes(x=DE, fill=DE, y=proportion)) + 
+  ggplot2::geom_bar(stat='identity') +
+  facet_grid(. ~gene_type) +
+  xlab('') +
+  main_theme() +
+  theme(legend.position = 'bottom',
+        axis.text.x=element_blank()) +
+  scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2)])
 
-c(rank$gene_type, 'other')
-bind_rows(common, other) %>%
-  spread(level, n) %>% 
-  mutate(gene_type=factor(gene_type, levels=c(rank$gene_type, 'other'))) %>%
-  arrange(ChrType, gene_type) %>% write_tsv("../Tables/gene_types.txt")
+
+
+#write_tsv(gene_types, "../Tables/gene_types.txt")
 ```
 
 
@@ -209,10 +215,12 @@ as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log
 filter(gene_sets, set=='Background') %>% 
   dplyr::select(ENSEMBL) %>% 
   mutate(Background=1) %>% 
-  right_join(filter(gene_sets, set=='SFARI' & !is.na(ENSEMBL))) %>% 
-  mutate(expressed=!is.na(Background)) %>% 
+  right_join(filter(gene_sets, set=='XlinkedID' & !is.na(ENSEMBL))) %>% 
+  mutate(expressed=!is.na(Background)) %>%
   group_by(expressed) %>% 
   summarise(n())
+
+filter(gene_sets, set=='XlinkedID') %>% inner_join(DEall)
 ```
 
 Figure S2
