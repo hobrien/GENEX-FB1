@@ -14,7 +14,7 @@ knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
 library(tidyverse)
 library(stringr)
 #library(gridExtra)
-#library(clusterProfiler)
+library(clusterProfiler)
 library(xlsx)
 library(EnsDb.Hsapiens.v86)
 library(ggbio)
@@ -86,15 +86,26 @@ Fig1
 
 Figure 2: Log2 fold sex differences across time-points for (a) replicating fetal genes and b) adult neuron genes. Red dots indicate significant sex bias in expression (FDR < 0.1)
 ``` {r}
-txdb <- EnsDb.Hsapiens.v86
-KDM2B_tr1 <- exonsBy(txdb, filter=TxIdFilter('ENST00000538046')) 
-p1 <- autoplot(KDM2B_tr1, group.selfish = TRUE, names='')
-KDM2B_tr2 <- exonsBy(txdb, filter=TxIdFilter('ENST00000611216')) 
-p2 <- autoplot(KDM2B_tr2, group.selfish = TRUE)
-p3 <- autoplot(txdb, which = GeneIdFilter('ENSG00000089094'), stat="reduce")
+ensdb <- EnsDb.Hsapiens.v86
+#KDM2B_tr1 <- exonsBy(ensdb, filter=TxIdFilter('ENST00000538046')) 
+p1and2 <- autoplot(ensdb, TxIdFilter(c('ENST00000538046', 'ENST00000611216')), gap.geom = "chevron") +
+  main_theme() +
+  theme(axis.text.x=element_text(size=9))
+
+p1 <- autoplot(ensdb, TxIdFilter('ENST00000538046'), gap.geom = "chevron", label=FALSE) +
+  main_theme() +
+  theme(axis.text.x=element_text(size=9))
+p2 <- autoplot(ensdb, TxIdFilter('ENST00000611216'), gap.geom = "chevron", label=FALSE) +
+  main_theme() +
+  theme(axis.text.x=element_text(size=9))
+#KDM2B_tr2 <- exonsBy(ensdb, filter=TxIdFilter('ENST00000611216')) 
+p3 <- autoplot(ensdb, GeneIdFilter('ENSG00000089094'), stat="reduce") +
+  main_theme() +
+  theme(axis.text.x=element_text(size=9))
 gene_models <- tracks(ENST00000538046 = p1, ENST00000611216=p2, gene = p3)
+#gene_models <- tracks(Transcripts = p1and2, Gene = p3, heights=c(2,1))
 #pdf("Fig2A.pdf")
-gene_models+main_theme()
+gene_models
 ggsave("../Figures/Fig2A.pdf")
 #dev.off()
 
@@ -144,41 +155,64 @@ ggsave("../Figures/Fig2B.pdf")
 Figure S1
 
 ```{r}
-p1 <- ggplot(target, aes(x=PCW, fill=Sex)) +
-  geom_bar() +
-  facet_grid(Sex ~ .) +
-  scale_y_continuous(breaks=seq(0,100, 2)) +
-  scale_x_continuous(breaks=seq(11,19, 1)) +
-  figure_theme() +
-  xlab("Post-conception weeks") +
-  ylab("Count") +
-  theme(axis.text.x=element_text(size=8)) +
-  scale_fill_brewer(type = "qual", palette = 6) +
-  ggtitle('A.')
+common <- DEall %>% group_by(gene_type) %>% 
+  dplyr::summarise(n=n()) %>% 
+  filter(n>10) %>% 
+  semi_join(DEall, .) %>% 
+  group_by(ChrType, gene_type, level) %>% 
+  dplyr::summarise(n=n()) 
 
-target <- mutate(target, age_bin =ifelse(target$PCW == 16, 15, 
-                                     ifelse(target$PCW > 16, 16, target$PCW)))
-p2 <- ggplot(target, aes(x=age_bin, fill=Sex)) +
-  geom_bar() +
-  facet_grid(Sex ~ .) +
-  scale_y_continuous(breaks=seq(0,100, 2)) +
-  scale_x_continuous(breaks=c(11,12,13,14,15,16),
-                     labels=c('11','12','13','14','15-16','17-19')) +
-  figure_theme() +
-  xlab("Post-conception weeks") +
-  ylab("Count") +
-  theme(axis.text.x=element_text(size=8)) +
-  scale_fill_brewer(type = "qual", palette = 6) +
-  ggtitle('B.')
+other <- DEall %>% group_by(gene_type) %>% 
+  dplyr::summarise(n=n()) %>% 
+  filter(n>10) %>% 
+  anti_join(DEall, .) %>%
+  group_by(ChrType, level) %>% 
+  dplyr::summarise(n=n()) %>%
+  mutate(gene_type='other')
 
-pdf(file="Figures/FigS1.pdf", 7.2, 5.5)
-grid.arrange(p1, p2, ncol=2)
-dev.off()
-png(file="Figures/FigS1.png", bg="transparent", width=183, height=140, units='mm', res=300)
-grid.arrange(p1, p2, ncol=2)
-dev.off()
-grid.arrange(p1, p2, ncol=2)
+rank <-common %>% group_by(gene_type) %>% dplyr::summarise(freq=sum(n)) %>% arrange(desc(freq))
 
+c(rank$gene_type, 'other')
+bind_rows(common, other) %>%
+  spread(level, n) %>% 
+  mutate(gene_type=factor(gene_type, levels=c(rank$gene_type, 'other'))) %>%
+  arrange(ChrType, gene_type) %>% write_tsv("../Tables/gene_types.txt")
+```
+
+
+```{r}
+gene_sets <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GeneSets.txt",
+"\t", escape_double = FALSE, trim_ws = TRUE)
+gene_sets <- fittedBias %>% mutate(set="Background", reference=NA) %>% 
+  dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id) %>%
+  bind_rows(gene_sets)
+
+gene_sets <- fittedBias %>% filter(gene_type == 'lincRNA') %>% mutate(set="lincRNA", reference='biomart') %>% 
+  dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id) %>%
+  bind_rows(gene_sets)
+
+gene_sets <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/ERR1_Q2.txt",
+"\t", escape_double = FALSE, col_names = colnames(gene_sets)[1:3],
+trim_ws = TRUE) %>% left_join(dplyr::select(gene_info, gene_name, ENSEMBL=gene_id)) %>% bind_rows(gene_sets)
+
+group_by(gene_sets, set) %>% summarise(n())
+
+as.data.frame(enricher(filter(DEall, (level=='both' | level=='gene-level') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+as.data.frame(enricher(filter(DEall, (level=='both') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log2FoldDiff>0)$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log2FoldDiff<0)$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+
+filter(gene_sets, set=='Background') %>% 
+  dplyr::select(ENSEMBL) %>% 
+  mutate(Background=1) %>% 
+  right_join(filter(gene_sets, set=='SFARI' & !is.na(ENSEMBL))) %>% 
+  mutate(expressed=!is.na(Background)) %>% 
+  group_by(expressed) %>% 
+  summarise(n())
 ```
 
 Figure S2
