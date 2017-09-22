@@ -76,3 +76,9 @@ To get transcript to gene mapping:
 echo -e "transcript_id\tgene_id" > Data/tx2gene.txt 
 cat /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.gtf | grep transcript_id | perl -pe 's/.*(ENSGR?\d+).*(ENSTR?\d+).*/$2\t$1/' >> Data/tx2gene.txt 
 ```
+
+```
+source activate py35
+snakemake --cluster "qsub -l h_vmem={params.maxvmem}" -j 50
+```
+
