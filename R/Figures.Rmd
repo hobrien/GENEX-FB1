@@ -167,14 +167,17 @@ fittedBias <- fittedBias %>% filter(!is.na(gene_type)) %>%
 
 fittedBias %>% filter(padj<.1 & ChrType == 'autosome') %>%
   group_by(gene_type) %>% 
-  summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(padj<.1 & ChrType == 'autosome'))), DE='SexBiased') %>%
+  summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(padj<.1 & ChrType == 'autosome')))*100, DE='SexBiased') %>%
   bind_rows(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome') %>%
               group_by(gene_type) %>% 
-              summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome'))), DE='Background')) %>%
+              summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome')))*100, DE='Background')) %>%
+  mutate(gene_type = factor(str_replace(gene_type, '_', ' ')), 
+         gene_type=factor(gene_type, levels=c(levels(gene_type)[levels(gene_type) != "other"], "other"))) %>%
   ggplot(aes(x=DE, fill=DE, y=proportion)) + 
   ggplot2::geom_bar(stat='identity') +
   facet_grid(. ~gene_type) +
   xlab('') +
+  ylab('% gene type') +
   main_theme() +
   theme(legend.position = 'bottom',
         axis.text.x=element_blank()) +
@@ -189,7 +192,8 @@ fittedBias %>% filter(padj<.1 & ChrType == 'autosome') %>%
 ```{r}
 gene_sets <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GeneSets.txt",
 "\t", escape_double = FALSE, trim_ws = TRUE)
-gene_sets <- fittedBias %>% mutate(set="Background", reference=NA) %>% 
+gene_sets <- fittedBias %>% filter(!is.na(padj)) %>%
+  mutate(set="Background", reference=NA) %>% 
   dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id) %>%
   bind_rows(gene_sets)
 
@@ -215,12 +219,11 @@ as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log
 filter(gene_sets, set=='Background') %>% 
   dplyr::select(ENSEMBL) %>% 
   mutate(Background=1) %>% 
-  right_join(filter(gene_sets, set=='XlinkedID' & !is.na(ENSEMBL))) %>% 
+  right_join(filter(gene_sets, set=='SandersASD' & !is.na(ENSEMBL))) %>% 
   mutate(expressed=!is.na(Background)) %>%
-  group_by(expressed) %>% 
-  summarise(n())
-
-filter(gene_sets, set=='XlinkedID') %>% inner_join(DEall)
+  filter(!expressed)
+  
+filter(gene_sets, set=='SandersASD') %>% inner_join(DEall)
 ```
 
 Figure S2
