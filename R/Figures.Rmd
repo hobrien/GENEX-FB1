@@ -29,14 +29,15 @@ sample_info <- read_delim("../Data/SampleInfo.txt", "\t", col_types=cols(Sample=
 
 fittedBias <- read_delim("../Shiny/GENEX-FB1/Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome')) 
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M')) %>%
+  filter(!is.na(padj) & !is.na(Chr))
 counts <- read_delim("../Shiny/GENEX-FB1/Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 counts_tr <- read_delim("../Shiny/GENEX-FB1/Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 fittedBias_tr <- read_delim("../Shiny/GENEX-FB1/Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M'),
-         ChrType = ifelse(Chr %in% c('chrX','chrY'), Chr, 'autosome'))
+  mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M')) %>%
+  filter(!is.na(padj) & !is.na(Chr))
+  
 
 fittedBias_topIsoform <- fittedBias_tr %>% group_by(GeneId) %>% arrange(padj) %>% dplyr::slice(1) %>% ungroup()
 
@@ -156,8 +157,7 @@ Figure 3:
 
 ```{r}
 
-fittedBias <- fittedBias %>% filter(!is.na(gene_type)) %>%
-  mutate(gene_type = ifelse(gene_type %in% c("antisense_RNA", "lincRNA", "protein_coding", "miRNA"),
+fittedBias <- fittedBias %>%  mutate(gene_type = ifelse(gene_type %in% c("antisense_RNA", "lincRNA", "protein_coding", "miRNA"),
                             gene_type, 
                             ifelse(gene_type %in% c("snRNA", "snoRNA"),
                                    "snRNA/snoRNA",
@@ -165,12 +165,12 @@ fittedBias <- fittedBias %>% filter(!is.na(gene_type)) %>%
                                           "pseudogene", 
                                           "other"))))
 
-fittedBias %>% filter(padj<.1 & ChrType == 'autosome') %>%
+fittedBias %>% filter(padj<.1 & ChrType == 'autosomal') %>%
   group_by(gene_type) %>% 
-  summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(padj<.1 & ChrType == 'autosome')))*100, DE='SexBiased') %>%
-  bind_rows(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome') %>%
+  summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(padj<.1 & ChrType == 'autosomal')))*100, DE='SexBiased') %>%
+  bind_rows(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosomal') %>%
               group_by(gene_type) %>% 
-              summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosome')))*100, DE='Background')) %>%
+              summarise(n=n(), proportion = n/nrow(filter(fittedBias %>% filter(!is.na(padj) & ChrType == 'autosomal')))*100, DE='Background')) %>%
   mutate(gene_type = factor(str_replace(gene_type, '_', ' ')), 
          gene_type=factor(gene_type, levels=c(levels(gene_type)[levels(gene_type) != "other"], "other"))) %>%
   ggplot(aes(x=DE, fill=DE, y=proportion)) + 
@@ -190,12 +190,11 @@ fittedBias %>% filter(padj<.1 & ChrType == 'autosome') %>%
 
 
 ```{r}
+background <- fittedBias %>% mutate(set="Background", reference=NA) %>% 
+  dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id)
+
 gene_sets <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GeneSets.txt",
 "\t", escape_double = FALSE, trim_ws = TRUE)
-gene_sets <- fittedBias %>% filter(!is.na(padj)) %>%
-  mutate(set="Background", reference=NA) %>% 
-  dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id) %>%
-  bind_rows(gene_sets)
 
 gene_sets <- fittedBias %>% filter(gene_type == 'lincRNA') %>% mutate(set="lincRNA", reference='biomart') %>% 
   dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id) %>%
@@ -205,63 +204,77 @@ gene_sets <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/ERR1_Q2.txt"
 "\t", escape_double = FALSE, col_names = colnames(gene_sets)[1:3],
 trim_ws = TRUE) %>% left_join(dplyr::select(gene_info, gene_name, ENSEMBL=gene_id)) %>% bind_rows(gene_sets)
 
-group_by(gene_sets, set) %>% summarise(n())
+gene_sets_filtered <- semi_join(gene_sets, dplyr::select(background, ENSEMBL))
 
-as.data.frame(enricher(filter(DEall, (level=='both' | level=='gene-level') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+group_by(gene_sets, set) %>% 
+  summarise(set_size=n()) %>%
+  full_join(group_by(gene_sets_filtered, set) %>% summarise(expressed=n()))
 
-as.data.frame(enricher(filter(DEall, (level=='both') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+gene_sets_filtered <- bind_rows(gene_sets_filtered, background)
 
-as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log2FoldDiff>0)$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+as.data.frame(enricher(filter(DEall, (level=='both' | level=='gene-level') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets_filtered, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
 
-as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosome' & log2FoldDiff<0)$Id, TERM2GENE=dplyr::select(gene_sets, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+as.data.frame(enricher(filter(DEall, (level=='both') & ChrType=='autosomal')$Id, TERM2GENE=dplyr::select(gene_sets_filtered, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosomal' & log2FoldDiff>0)$Id, TERM2GENE=dplyr::select(gene_sets_filtered, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
+
+as.data.frame(enricher(filter(fittedBias, pvalue<.05 & ChrType=='autosomal' & log2FoldDiff<0)$Id, TERM2GENE=dplyr::select(gene_sets_filtered, set, ENSEMBL), pAdjustMethod='bonferroni', pvalueCutoff = .2, maxGSSize = 10000))
 
 
-filter(gene_sets, set=='Background') %>% 
+filter(gene_sets, set=='SandersASD') %>%
+  left_join(dplyr::select(fittedBias, Id, padj), by=c("ENSEMBL" = "Id")) %>% View()
+
+
   dplyr::select(ENSEMBL) %>% 
   mutate(Background=1) %>% 
-  right_join(filter(gene_sets, set=='SandersASD' & !is.na(ENSEMBL))) %>% 
+  right_join(filter(gene_sets_filtered, set=='SandersASD' & !is.na(ENSEMBL))) %>% 
   mutate(expressed=!is.na(Background)) %>%
   filter(!expressed)
   
-filter(gene_sets, set=='SandersASD') %>% inner_join(DEall)
+filter(gene_sets_filtered, set=='SandersASD') %>% inner_join(DEall)
 ```
 
-Figure S2
+Correlation between counts and RIN
 ```{r}
-Neuronal <- gene_sets %>% 
-  filter(set=='Neuronal' & gene_name != 'XIST') %>% 
-  inner_join(fittedBias)
-group_by(Neuronal, ageBin) %>% summarise(n=n())
+cor <- left_join(DEgenes, counts) %>%
+  dplyr::select(-SYMBOL, -Chr, -gene_type, -ChrType) %>%
+  gather(label, norm_count, -Id) %>% 
+  mutate(label=gsub('norm.', '', label )) %>%
+  left_join(sample_info) %>% 
+  group_by(Id) %>% 
+  summarise(r=cor.test(norm_count, RIN)[[4]], p_val=cor.test(norm_count, RIN)[[3]])
 
-RG <- gene_sets %>% 
-  filter(set=='RadialGlia' & gene_name != 'XIST') %>%
-  inner_join(fittedBias)
-group_by(RG, ageBin) %>% summarise(n=n())
+cor_tr <- filter(fittedBias_tr, padj < 0.1) %>%
+  dplyr::select(Id) %>%
+  left_join(counts_tr) %>%
+  dplyr::select(-SYMBOL, -Chr, -gene_type, -ChrType, -GeneId) %>%
+  gather(label, norm_count, -Id) %>% 
+  mutate(label=gsub('norm.', '', label )) %>%
+  left_join(sample_info) %>%
+  group_by(Id) %>%
+  summarise(r=cor.test(norm_count, RIN)[[4]], p_val=cor.test(norm_count, RIN)[[3]])
 
-NPC <- gene_sets %>% 
-  filter(set=='NPC' & gene_name != 'RPS4Y1') %>%
-  inner_join(fittedBias)
-group_by(NPC, ageBin) %>% summarise(n=n())
+cor_bg <- fittedBias %>% dplyr::select(Id) %>%
+  left_join(counts) %>%
+  dplyr::select(-SYMBOL, -Chr, -gene_type, -ChrType) %>%
+  gather(label, norm_count, -Id) %>% 
+  mutate(label=gsub('norm.', '', label )) %>%
+  left_join(sample_info) %>%
+  group_by(Id) %>%
+  summarise(r=cor.test(norm_count, RIN)[[4]], p_val=cor.test(norm_count, RIN)[[3]])
 
-png(file="Figures/FigS2.png", bg="transparent", width=183, 
-    height=210, units='mm', res=300)
-grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
-             PlotFC(RG, 'B. Radial glia genes'),
-             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
-             ncol=1)
-dev.off()
-pdf(file="Figures/FigS2.pdf", 7.2, 9)
-grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
-             PlotFC(RG, 'B. Radial glia genes'),
-             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
-             ncol=1)
-dev.off()
 
-grid.arrange(PlotFC(NPC, 'A. iPSC-derived neural progenitor cell genes'),
-             PlotFC(RG, 'B. Radial glia genes'),
-             PlotFC(Neuronal, 'C. Fetal neuron genes'), 
-             ncol=1)
+filter(cor, p_val < 0.05) %>% nrow()/nrow(cor)
+ggplot(cor, aes(x=r)) + geom_histogram() + main_theme()
+ggplot(cor, aes(x=p_val)) + geom_histogram() + main_theme()
 
+filter(cor_tr, p_val < 0.05) %>% nrow()/nrow(cor)
+ggplot(cor_tr, aes(x=r)) + geom_histogram() + main_theme()
+ggplot(cor_tr, aes(x=p_val)) + geom_histogram() + main_theme()
+
+mutate(cor, DE='yes') %>%
+  bind_rows(mutate(cor_bg, DE='no')) %>%
+  ggplot(aes(x=r)) + geom_histogram() + facet_grid( DE ~ ., scales = "free") + main_theme()
 ```
 
 Enrichment Analysis
