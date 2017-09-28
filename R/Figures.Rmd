@@ -183,12 +183,37 @@ fittedBias %>% filter(padj<.1 & ChrType == 'autosomal') %>%
         axis.text.x=element_blank()) +
   scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2)])
 
+ggsave("../Figures/Fig3.pdf")
 
-
-#write_tsv(gene_types, "../Tables/gene_types.txt")
 ```
 
+Figure 4:
 
+```{r}
+PlotExpression <- function(counts, sample_info, geneID) {
+  data <- counts %>% filter(SYMBOL == geneID) %>%  
+    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'gene_type')) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(sample_info)
+  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
+    geom_jitter(height = 0, width=.1, alpha=.75) + 
+    scale_x_continuous(breaks=seq(12, 20)) +
+    ylab("normalised counts") +
+    xlab('post-conception weeks') +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(geneID) 
+  plot
+}
+
+PlotExpression(counts, sample_info, 'KDM5C') 
+
+ggsave("../Figures/Fig4.pdf")
+```
+
+Enrichment Analysis
 ```{r}
 background <- fittedBias %>% mutate(set="Background", reference=NA) %>% 
   dplyr::select(gene_name=SYMBOL, set, reference, ENSEMBL=Id)
@@ -334,26 +359,8 @@ write_tsv(Enrichment, "Tables/EnrichmentAll.txt")
 Enrichment
 ```
 
-Supplementary Table 1: Sampling info
-```{r}
-TotalFragments <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Tables/CountSummary.txt",
-"\t", escape_double = FALSE, col_types = cols(Sample = col_character()),
-trim_ws = TRUE) %>% dplyr::select(Sample, TotalFragments)
 
-SampleInfo <- read_tsv("../Data/SampleInfo.txt", col_types = cols(Sample = col_character())) %>%
-  full_join(TotalFragments) %>%
-  mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
-  dplyr::select(-TotalFragments)
-
-write.xlsx2(as.data.frame(SampleInfo), 
-            file="../Tables/SupplementalTables.xlsx", 
-            row.names=FALSE,
-            sheetName='TblS1',
-            append=FALSE)
-
-```
-
-Supplementary Table 2: Genes with significant sex Biases (FDR<0.1)
+Supplementary Table 1: Genes with significant sex Biases (FDR<0.1)
 ```{r}
 DEG12_19 <- fittedBias %>% filter(padj<0.1 & !is.na(Chr)) %>%
   mutate(`FoldDiff` = 2^log2FoldDiff, 
@@ -373,10 +380,32 @@ DEG12_19 <- fittedBias %>% filter(padj<0.1 & !is.na(Chr)) %>%
 write.xlsx2(as.data.frame(DEG12_19), 
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
+            sheetName='TblS1',
+            append=FALSE)
+```
+
+# Supplementary Table 2: Comparison with previous findings
+
+```{r}
+previous <- read_tsv("../Data/previous_findings.txt")
+sig_res <- fittedBias %>%
+  filter(padj < 0.1 & !is.na(Chr)) %>%
+  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
+         Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) %>%
+  dplyr::select(Id, SYMBOL, Chr, result) %>%
+  arrange(Chr) %>% 
+  dplyr::rename(`Ensembl ID` = Id, 
+                `Gene ID` = SYMBOL,
+                Chromosome = Chr,
+                `Male Expression / Female (FDR-corrected p-value)` = result) %>%
+  left_join(previous)
+
+write.xlsx2(as.data.frame(sig_res), 
+            file="../Tables/SupplementalTables.xlsx", 
+            row.names=FALSE,
             sheetName='TblS2',
             append=TRUE)
 ```
-
 
 Supplementary Table 3: Transcripts with significant sex Biases (FDR<0.1)
 ```{r}
@@ -403,42 +432,23 @@ write.xlsx2(as.data.frame(DEG12_19_tr),
             append=TRUE)
 ```
 
-# Supplementary Table 4: Comparison with previous findings
-- transcript-level analysis = isoform with the lowset p-value
 
+Supplementary Table 4: Sampling info
 ```{r}
-previous <- read_tsv("../Data/previous_findings.txt")
-sig_res <- fittedBias %>%
-  filter(padj < 0.1 & !is.na(Chr)) %>%
-  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
-         level = 'Gene-level Analysis') %>%
-  dplyr::select(Id, SYMBOL, Chr, result, level)
+TotalFragments <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Tables/CountSummary.txt",
+"\t", escape_double = FALSE, col_types = cols(Sample = col_character()),
+trim_ws = TRUE) %>% dplyr::select(Sample, TotalFragments)
 
-sig_res_tr <- fittedBias_tr %>%
-  filter(padj < 0.1 & !is.na(Chr)) %>%
-  arrange(padj) %>%
-  group_by(GeneId) %>%
-  dplyr::slice(1) %>%
-  dplyr::select(-Id, Id=GeneId) %>%
-  mutate(result = paste0(format(log2FoldDiff, digits=2), ' (', format(padj, digits=2), ')'),
-         level = 'Transcript-level Analysis') %>%
-  dplyr::select(Id, SYMBOL, Chr, result, level)
+SampleInfo <- read_tsv("../Data/SampleInfo.txt", col_types = cols(Sample = col_character())) %>%
+  full_join(TotalFragments) %>%
+  mutate(`Total Read Pairs (millions)` = round(TotalFragments/1000000)) %>%
+  dplyr::select(-TotalFragments)
 
-sig_res_all <- bind_rows(sig_res, sig_res_tr) %>%
-  spread(level, result) %>% 
-  mutate(Chr = parse_factor(Chr, str_c('chr', c(seq(1,22), 'X', 'Y')))) %>%
-  arrange(Chr) %>% 
-  dplyr::rename(`Ensembl ID` = Id, 
-                `Gene ID` = SYMBOL,
-                Chromosome = Chr) %>%
-  left_join(previous)
-
-write.xlsx2(as.data.frame(sig_res_all), 
+write.xlsx2(as.data.frame(SampleInfo), 
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS4',
             append=TRUE)
+
 ```
-
-
 
