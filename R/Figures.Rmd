@@ -63,7 +63,16 @@ PARgenes <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/PARgenes.txt"
 
 DEall <- left_join(DEall, dplyr::select(PARgenes, gene_name=`Approved Symbol`, PAR=Unknown)) %>%
   mutate(ChrType=ifelse(is.na(PAR), ChrType, 'PAR'))
-Fig1 <- ggplot(DEall, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+
+DEall %>% mutate(level=relevel(factor(ifelse(level=='both', 
+                                      'Both gene and transcript level',
+                                      ifelse(level=='gene-level', 
+                                             'Additional at gene level only',
+                                             ifelse(level=='transcript-level',
+                                                    'Additional at transcript level only',
+                                                    NA)))),
+                                      ref='Both gene and transcript level')) %>%
+  ggplot(aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
   facet_grid(~ level) +
     figure_theme() +
     #scale_y_continuous(breaks=seq(100,1000,100)) +
@@ -73,16 +82,8 @@ Fig1 <- ggplot(DEall, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR
     xlab('Fetal sex') +
     theme(axis.title.y=element_text(size=9)) +
     theme(axis.title.x=element_text(size=9)) +
-    ggtitle('A.') +
     theme(legend.position = 'right')
-png(file="../Figures/Fig1.png", bg="transparent", width=183, 
-    height=70, units='mm', res=300)
-Fig1
-dev.off()
-pdf(file="../Figures/Fig1.pdf", 7.2, 3)
-Fig1
-dev.off()
-Fig1
+ggsave("../Figures/Fig1.pdf")
 ```
 
 Figure 2: 
@@ -200,10 +201,11 @@ PlotExpression <- function(counts, sample_info, geneID) {
   plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
     geom_jitter(height = 0, width=.1, alpha=.75) + 
     scale_x_continuous(breaks=seq(12, 20)) +
-    ylab("normalised counts") +
-    xlab('post-conception weeks') +
+    ylab("Normalized Counts") +
+    xlab('Post-Conception Weeks') +
     main_theme() +
     scale_colour_brewer(type = "qual", palette = 6) +
+    theme(legend.position = 'bottom')
     ggtitle(geneID) 
   plot
 }
