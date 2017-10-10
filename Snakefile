@@ -7,9 +7,9 @@ rule all:
 
 rule format_bed:
     input:
-        "$REFDIR/Annotation/Genes.gencode/genes.bed"
+        os.path.join(ref_dir, "Annotation/Genes.gencode/genes.bed")
     output:
-        "$REFDIR/Annotation/Genes.gencode/genes.bed12"
+        os.path.join(ref_dir, "Annotation/Genes.gencode/genes.bed12")
     params:
         maxvmem = "4G",
     shell:
@@ -18,7 +18,7 @@ rule format_bed:
 rule transcript_seqs:
     input:
         bed = rules.format_bed.output,
-        fasta = $REFDIR/Sequence/WholeGenomeFasta/genome.fa
+        fasta = os.path.join(ref_dir, "/Sequence/WholeGenomeFasta/genome.fa")
     output:
         "$REFDIR/Annotation/Genes.gencode/genes.fa"
     params:
@@ -31,7 +31,7 @@ rule make_index:
     input:
         rules.transcript_seqs.output
     output:
-        "$REFDIR/Annotation/Genes.gencode/kallisto.inx"
+        os.path.join(ref_dir, "/Annotation/Genes.gencode/kallisto.inx")
     params:
         maxvmem = "4G",
     log:

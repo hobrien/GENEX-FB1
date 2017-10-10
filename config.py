@@ -3,6 +3,7 @@ import os
 import re
 from collections import defaultdict
 
+ref_dir="/c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy"
 
 with open("Data/sequences.txt", "r") as f:
     reader = csv.reader(f, delimiter="\t")
