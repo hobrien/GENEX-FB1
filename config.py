@@ -9,6 +9,7 @@ with open("Data/sequences.txt", "r") as f:
     samples = defaultdict(list)
     filenames = defaultdict(list)
     folders = defaultdict(list)
+    readfiles = {}
     for row in reader:
         sample = row[1]
         brain_bank_id = sample.split('-')[0]
@@ -22,4 +23,4 @@ with open("Data/sequences.txt", "r") as f:
                 folder = folders[sample][read]
                 file = filenames[sample][read]
                 sequences = sequences + [f for f in os.listdir(folder) if re.match(re.escape(file) + r'.*f(ast)?q(.gz)?$', f)]
-        print(": ".join([brain_bank_id, ",".join(sorted(sequences))]))
+        readfiles[brain_bank_id] = " ".join(sorted(sequences))

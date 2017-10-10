@@ -1,6 +1,5 @@
 configfile: "config.yaml"
 
-
 rule all:
     input:
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts_report.html", 
@@ -42,7 +41,8 @@ rule make_index:
         
 rule run_kalliso:
     input:
-        rules.make_index.output,
+        index = rules.make_index.output,
+        reads = [readfiles.values()]
     output:
         "Kallisto/{sample}/abundances.h5",
         "Kallisto/{sample}/abundances.tsv",
@@ -54,7 +54,7 @@ rule run_kalliso:
     log:
         "Logs/kallisto_quant_{sample}.txt"
     shell:
-        "(kallisto quant -i {input.index} -o {params.prefix --bias -b 100 --rf-stranded $sequences) 2> {log}"
+        "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
 
 rule gene_level:
     input:
