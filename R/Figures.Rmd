@@ -13,7 +13,7 @@ knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
 
 library(tidyverse)
 library(stringr)
-#library(gridExtra)
+library(gridExtra)
 library(clusterProfiler)
 library(xlsx)
 library(EnsDb.Hsapiens.v86)
@@ -37,7 +37,11 @@ fittedBias_tr <- read_delim("../Shiny/GENEX-FB1/Data/fitted_tr.txt", "\t", escap
   dplyr::rename(log2FoldDiff = log2FoldChange) %>%
   mutate(Sex = ifelse(log2FoldDiff < 0, 'F', 'M')) %>%
   filter(!is.na(padj) & !is.na(Chr))
-  
+
+fittedPCW <- read_delim("../Shiny/GENEX-FB1/Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
+  filter(!is.na(padj) & !is.na(Chr))
+
 
 fittedBias_topIsoform <- fittedBias_tr %>% group_by(GeneId) %>% arrange(padj) %>% dplyr::slice(1) %>% ungroup()
 
@@ -52,10 +56,55 @@ DEall <- inner_join(DEgenes, DEtranscripts) %>%
   inner_join(gene_info, by=c('Id' = 'gene_id')) %>%
   left_join(dplyr::select(fittedBias, Id, gene_padj=padj)) %>%
   left_join(dplyr::select(fittedBias_topIsoform, Id=GeneId, transcript_padj=padj, Sex))
+
+XCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
+"\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
+trim_ws = TRUE) 
+XCI <- XCI %>% group_by(SYMBOL) %>% 
+  dplyr::summarise(n=n()) %>% 
+  filter(n==1) %>% 
+  left_join(XCI) %>% 
+  dplyr::select(-n)
 ```
 
 
 Figure 1.
+
+```{r}
+PlotExpression<-function(geneID, fig_num, counts, fittedPCW, sample_info) {
+  fit_params <- filter(fittedPCW, SYMBOL==geneID)
+  data <- counts %>% filter(SYMBOL == geneID) %>%  
+    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'gene_type')) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(sample_info)
+  mean_age<-mean(sample_info$PCW)
+  fit <- data.frame(PCW=seq(12,19)) %>%
+    mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
+    title<-paste0(fig_num, ': ', geneID)
+  plot<-  ggplot(data, aes(x=PCW, y=value)) + 
+    geom_jitter(height = 0, width=.1, alpha=.75) + 
+    geom_line(aes(y=fit), colour='black', data=fit) +
+    scale_x_continuous(breaks=seq(12, 20)) +
+    ylab("Normalized Counts") +
+    xlab('Post-Conception Weeks') +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(title) +
+    theme(axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))
+  plot
+}
+pdf("../Paper/Fig1.pdf")
+grid.arrange(PlotExpression('TTLL7', 'A', counts, fittedPCW, sample_info),
+             PlotExpression('RHBDL3', 'B', counts, fittedPCW, sample_info), 
+             ncol=2)
+dev.off()
+#ggsave("../Paper/Fig1.pdf")
+```
+
+Figure 2.
 
 ```{r}
 PARgenes <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/PARgenes.txt",
@@ -83,10 +132,10 @@ DEall %>% mutate(level=relevel(factor(ifelse(level=='both',
     theme(axis.title.y=element_text(size=9)) +
     theme(axis.title.x=element_text(size=9)) +
     theme(legend.position = 'right')
-ggsave("../Figures/Fig1.pdf")
+ggsave("../Paper/Fig2.pdf")
 ```
 
-Figure 2: 
+Figure 3: 
 ``` {r}
 ensdb <- EnsDb.Hsapiens.v86
 #KDM2B_tr1 <- exonsBy(ensdb, filter=TxIdFilter('ENST00000538046')) 
@@ -108,7 +157,7 @@ gene_models <- tracks(ENST00000538046 = p1, ENST00000611216=p2, gene = p3)
 #gene_models <- tracks(Transcripts = p1and2, Gene = p3, heights=c(2,1))
 #pdf("Fig2A.pdf")
 gene_models
-ggsave("../Figures/Fig2A.pdf")
+ggsave("../Figures/Fig3A.pdf")
 #dev.off()
 
 
@@ -147,14 +196,14 @@ ggplot(KDM2Bcounts, aes(x=Sex, colour=Sex)) +
       strip.background = element_blank(),
       strip.text = element_blank()
     )
-ggsave("../Figures/Fig2B.pdf")
+ggsave("../Figures/Fig3B.pdf")
 #pdf("../Figures/Fig2B.pdf")
 #ANOS1expression
 #dev.off()
 
 ```
 
-Figure 3:
+Figure 4:
 
 ```{r}
 
@@ -184,11 +233,11 @@ fittedBias %>% filter(padj<.1 & ChrType == 'autosomal') %>%
         axis.text.x=element_blank()) +
   scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2)])
 
-ggsave("../Figures/Fig3.pdf")
+ggsave("../Paper/Fig4.pdf")
 
 ```
 
-Figure 4:
+Figure 5:
 
 ```{r}
 PlotExpression <- function(counts, sample_info, geneID) {
@@ -212,7 +261,24 @@ PlotExpression <- function(counts, sample_info, geneID) {
 
 PlotExpression(counts, sample_info, 'KDM5C') 
 
-ggsave("../Figures/Fig4.pdf")
+ggsave("../Paper/Fig5.pdf")
+```
+
+Figure S1
+```{r}
+left_join(XCI, fittedBias) %>%
+  mutate(sig=ifelse(padj<.1, 1,0), Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
+  filter(SYMBOL != 'XIST') %>%
+  ggplot(aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
+    geom_jitter(height = 0, width=.25, alpha=.25) +
+    main_theme() +
+    scale_colour_manual(values=c("black", "red")) +
+    ylab("Log2 Fold Difference") +
+    theme(axis.text.x=element_text(size=9, angle=45, hjust=1),
+          axis.text.y=element_text(size=9),
+          axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))
+ggsave("../Paper/FigS1.pdf")   
 ```
 
 Enrichment Analysis
@@ -450,6 +516,21 @@ write.xlsx2(as.data.frame(SampleInfo),
             file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS4',
+            append=TRUE)
+
+```
+
+Supplementary Table 5: X inactivation
+```{r}
+inner_join(XCI, fittedBias) %>% 
+  dplyr::select(-Male, -Female, -Sex, -ChrType, -maxCooks) %>% 
+  dplyr::select(Id, everything()) %>%
+  mutate(Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
+  arrange(Status) %>%
+  as.data.frame() %>%
+  write.xlsx2(file="../Tables/SupplementalTables.xlsx", 
+            row.names=FALSE,
+            sheetName='TblS5',
             append=TRUE)
 
 ```
