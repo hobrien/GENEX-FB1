@@ -97,10 +97,10 @@ projectName <- paste0(varInt,
        'FDR_', alpha,
        '_',
        opt$tool,
+       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature)),
        ifelse(length(exclude > 0),
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
        ifelse(opt$sex_chromosomes, '_autosomes', ''),
-       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature)),
        ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
        ifelse(opt$kallisto, "_kallistoCounts", "")
 )                         # name of the project

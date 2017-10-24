@@ -57,16 +57,32 @@ DEall <- inner_join(DEgenes, DEtranscripts) %>%
   left_join(dplyr::select(fittedBias, Id, gene_padj=padj)) %>%
   left_join(dplyr::select(fittedBias_topIsoform, Id=GeneId, transcript_padj=padj, Sex))
 
-XCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
-"\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
-trim_ws = TRUE) 
-XCI <- XCI %>% group_by(SYMBOL) %>% 
-  dplyr::summarise(n=n()) %>% 
-  filter(n==1) %>% 
-  left_join(XCI) %>% 
-  dplyr::select(-n)
-```
+XCIsummary <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/XCIsummary.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
 
+GTExXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExXCI.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+
+GTExNovel <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExNovel.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+
+NewFindings <- filter(GTExXCI, NewCall=='x') %>% 
+  dplyr::rename(GeneName = Name) %>%
+  mutate(GTExStatus = 'variable') %>%
+  dplyr::select(GeneID, GeneName, Chr, Start, End, GTExStatus) %>%
+  full_join(GTExNovel) %>%
+  mutate(GTExStatus = ifelse(is.na(GTExStatus), 'escape', GTExStatus))
+
+BallatonXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
+"\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
+trim_ws = TRUE)
+
+BallatonXCI <- group_by(BallatonXCI, SYMBOL) %>% dplyr::summarise(n=n()) %>% filter(n==1) %>% left_join(BallatonXCI) %>% dplyr::select(-n)
+
+XCI <- dplyr::select(NewFindings, GeneID, GeneName, Chr, Start, End, GTExStatus) %>%
+  full_join(XCIsummary, by=c("GeneID", "GeneName", "Chr", "Start", "End")) %>%
+  mutate(GTExStatus=ifelse(is.na(GTExStatus), CombinedXCIstatus, GTExStatus), Id=str_extract(GeneID, '^[^.]+')) %>%
+  dplyr::select(-Chr)
+
+XCI <- full_join(BallatonXCI, XCI, by=c('SYMBOL'='GeneName')) 
+```
 
 Figure 1.
 
@@ -265,12 +281,15 @@ ggsave("../Paper/Fig5.pdf")
 ```
 
 Figure S1
+- PRKX is Male biased and not in the PAR. It is reported as Female biased in GTEx
+- NLGN4X is discrepent (according to Ballaton, it was found to be 100% E by Carrel & Willard; according to Tukiainen it was not tested (VE according to Cotton et al.))
 ```{r}
-left_join(XCI, fittedBias) %>%
-  mutate(sig=ifelse(padj<.1, 1,0), Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
-  filter(SYMBOL != 'XIST') %>%
-  ggplot(aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
+XCI_DE <- left_join(XCI, fittedBias, by='SYMBOL') %>% 
+  mutate(sig=ifelse(padj<.1, 1,0)) %>%
+  filter(SYMBOL != 'XIST')
+ggplot(XCI_DE, aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
     geom_jitter(height = 0, width=.25, alpha=.25) +
+    facet_grid(GTExStatus ~ .) +
     main_theme() +
     scale_colour_manual(values=c("black", "red")) +
     ylab("Log2 Fold Difference") +
@@ -527,7 +546,7 @@ inner_join(XCI, fittedBias) %>%
   dplyr::select(Id, everything()) %>%
   mutate(Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
   arrange(Status) %>%
-  as.data.frame() %>%
+  as.data.frame() %>% View()
   write.xlsx2(file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS5',
