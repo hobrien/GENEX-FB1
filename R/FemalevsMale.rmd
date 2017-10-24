@@ -18,6 +18,7 @@ library(ggbiplot)
 library(stringr)
 library(genefilter)
 library(biomaRt)
+library(ggbio)
 #setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 source("../Shiny/GENEX-FB1/FormatGGplot.R")
 
@@ -129,7 +130,10 @@ SleuthIsoform <- read_delim("../Results/SleuthPCW_RIN_annotated.txt",
 #select the transcript for each gene with the lowest qvalue
 SleuthTopIsoform <- SleuthIsoform %>% group_by(Id) %>% arrange(qval) %>% dplyr::slice(1) %>% ungroup()
 
-
+fittedBias <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt") %>% left_join(dplyr::select(gene_info, Id, gene_type))
+fittedBias_tr <- read_tsv("../Shiny/GENEX-FB1/Data/fitted_tr.txt")  %>% left_join(dplyr::select(gene_info, Id, gene_type))
+fittedBias_topIsoform <- fittedBias_tr %>% group_by(Id) %>% arrange(padj) %>% dplyr::slice(1) %>% ungroup()
+#left_join(fittedBias_topIsoform, dplyr::select(gene_info, Id, gene_type), by=c('GeneID'))
 ```
 
 ## Histogram of sample size per week/sex
@@ -522,12 +526,14 @@ ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is
 
 ```{r gene_vs_isoform}
 
-SleuthTopIsoformSig <- (filter(SleuthTopIsoform, qval<.1 & ! is.na(Id)))
-
+TopIsoformSig <- (filter(fittedBias_topIsoform, padj<.1 & ! is.na(Id)))
+SigGenes <- filter(fittedBias, padj<.1)
 # Need to join on Id, SYMBOL, Chr and gene_type because otherwise if these are added from one of the data sets, the values are NA for any genes that weren't tested for that dataset.
 # Unfortunately I've uesed different data sources for assigning SYMBOLs to the gene IDs. This means that some rows are duplicated. The group/slice/ungroup at the end takes care of this
-gene_vs_isoform_Sleuth <- SleuthSig %>%
-  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
+gene_vs_isoform 
+  
+SigGenes %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>% View()
   full_join(dplyr::select(SleuthTopIsoformSig, Id, SYMBOL, Chr, gene_type)) %>% 
   left_join(dplyr::select(Sleuth, Id, ChrType, gene_pvalue = pval, gene_padj = qval)) %>%
   left_join(dplyr::select(SleuthTopIsoform, Id, isoform_pvalue=pval, isoform_padj=qval)) %>% 
@@ -672,14 +678,14 @@ PlotTranscriptByAge('ENST00000381154', AllKallisto, SleuthIsoform)
 
 ```{r}
 sigGenes %>% group_by(ChrType, ageBin, gene_type, Method) %>% 
-  summarise(n=n()) %>%
-  spread(Method, n)
+  dplyr::summarise(n=n()) %>%
+  spread(Method, n) %>%
 #select(sigGenes, gene_type, ChrType) %>% table() %>% as.data.frame()
 
 sigAutosomesNum <- dim(filter(sigGenes, ChrType == 'autosomal'))[1]
 sigGenes %>% filter(ChrType == 'autosomal') %>% 
   group_by(gene_type) %>% 
-  summarise(autosomalDE=n()/sigAutosomesNum) %>% 
+  dplyr::summarise(autosomalDE=n()/sigAutosomesNum) %>% 
   arrange(desc(autosomalDE))
 
 BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(
@@ -696,7 +702,7 @@ BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\
 ))
 BG %>% 
   group_by(gene_type) %>%
-  summarise(background=n()/dim(BG)[1]) %>%
+  dplyr::summarise(background=n()/dim(BG)[1]) %>%
   arrange(desc(background))
 
 ggplot(filter(BG, Chr != 'chrX' & Chr != 'chrY'), aes(x=gene_type, y=baseMean)) +
@@ -934,9 +940,11 @@ PlotPCA(pca_df, prp, "V3")
 ```{r}
 #library("ggbio")
 library(grid)
-library(png)
-load(system.file("data", "hg19IdeogramCyto.rda", package="biovizBase", mustWork=TRUE))
+#library(png)
+library(biovizBase)
+data(hg19IdeogramCyto)
 
+idio<-plotIdeogram(hg19IdeogramCyto, "chrX", aspect.ratio = 1/20)
 #png("../Figures/chrX.png", bg='transparent')
 #plotIdeogram(hg19IdeogramCyto, "chrX")
 #dev.off()
@@ -963,14 +971,68 @@ ggplot(ChrXgenes, aes(x=pos, y=log2FoldChange, colour=ChrType, shape=factor(sig)
   theme(plot.background=element_blank())
 
 ```
+- A large number of genes symbols have multiple entries in the Ballaton table
+- Almost all of these are classified as "no call"
+- There are two genes labeled FAM156A that are both S and two genes labeled SPACA5, one of which is Mostly S and the other one of which is "no call"
+- Since the classifications are almost always consistent, I could just remove the duplicates, but since most of them are "no call" which isn't very interesting anyway, I'm just going to filter all of these out for now.
+- XIST is excluded
 
+```{r}
+XCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
+"\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
+trim_ws = TRUE)
+
+XCI <- group_by(XCI, SYMBOL) %>% dplyr::summarise(n=n()) %>% filter(n==1) %>% left_join(XCI) %>% dplyr::select(-n)
+
+left_join(XCI, fittedBias) %>%
+  mutate(sig=ifelse(padj<.1, 1,0)) %>%
+  filter(SYMBOL != 'XIST') %>%
+  ggplot(aes(x=Status, y=log2FoldChange, colour=factor(sig))) +
+    geom_jitter(height = 0, width=.25, alpha=.25) +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    theme(axis.text.x=element_text(size=9))
+    
+left_join(XCI, fittedBias) %>%
+  mutate(sig=ifelse(padj<.1, 1,0)) %>%
+  filter(is.na(padj) & Status != 'No call')
+
+filter(XCI, Status != 'No call') %>% dim()
+```
+
+# GTEx Analysis
+- supp table 1 summarises previous findings by Cotton et al and Carrel & Willard
+- supp table 3 lists 9 genes that have not previously been reported as escape but which have similar expression patterns as escape genes (see fig 2d in Tukiainen et al)
+- supp table 13 lists a subset of the genes in supp table 1 (563/631), plus 120 additional genes that are listed as "Unknown"
+- supp table 13 has info about ASE and SS expression, and marks 7 genes as NewCall (6 previously reported as inactive and one as unknown)
+- this includes 4/5 variable ASE genes from fig 3g-k (-USP11)
+- it also includes 4/7 variable genes from single-cell analysis in fig4e-k (-FTX/RPL36A/PHF8)
+- FHL1 is shared between methods
+- unclear why the other 4 genes are not considered new calls
+- CHM is in both the list of novel escape genes and the list of novel variable genes for some reason. I guess I'll call it variable
+
+- 583/631 genes in GTEx analysis can be matched to genes in Ballaton et al.
+- 27/27 E and 21/25 mostly E genes classified as escape in GTEx (as are 17/17 PAR genes)
+- 30/31 VE and 7/9 mostly VE genes classified as variable
+- 273/286 S and 90/110 mostly S genes classified as inactive (11 as variable and 2 as escape)
+ 
+```{r}
+XCIsummary <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/XCIsummary.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+group_by(XCIsummary, CombinedXCIstatus) %>% summarise(n=n())
+GTExXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExXCI.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+
+dplyr::select(XCIsummary, GeneID, contains('XCIstatus')) %>% full_join(GTExXCI) %>% group_by(CombinedXCIstatus, ReportedStatus) %>% summarise(n=n())
+
+filter(GTExXCI, NewCall=='x')
+
+inner_join(XCI, XCIsummary, by=c('SYMBOL'='GeneName')) %>% dim()
+inner_join(XCI, XCIsummary, by=c('SYMBOL'='GeneName')) %>% dplyr::select(Status, CombinedXCIstatus) %>% table()
+```
 # Overlap between DEGs and gene set members
 - all overlapping genes in the gene-level analysis are also present in the transcript-level analysis
 - does not include three genes from X-linked ID set which could not be associated with Ensembl IDs (HPRT, BRND3, DNDP)
 - need to be cautious about interpreting overlap with X-linked ID genes since chrX genes are generally female biased. I guess the appropriate background is all expressed chrX genes?
 ```{r enrichment}
-fittedBias_tr <- read_tsv("../Shiny/GENEX-FB1/Data/fitted_tr.txt")
-fittedBias <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt")
 gene_sets <-read_delim("../Data/GeneSets.txt", 
                        "\t", escape_double = FALSE, 
                        trim_ws = TRUE)
