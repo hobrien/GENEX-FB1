@@ -78,7 +78,7 @@ BallatonXCI <- group_by(BallatonXCI, SYMBOL) %>% dplyr::summarise(n=n()) %>% fil
 
 XCI <- dplyr::select(NewFindings, GeneID, GeneName, Chr, Start, End, GTExStatus) %>%
   full_join(XCIsummary, by=c("GeneID", "GeneName", "Chr", "Start", "End")) %>%
-  mutate(GTExStatus=ifelse(is.na(GTExStatus), CombinedXCIstatus, GTExStatus), Id=str_extract(GeneID, '^[^.]+')) %>%
+  mutate(CombinedXCIstatus=ifelse(is.na(GTExStatus), CombinedXCIstatus, GTExStatus), Id=str_extract(GeneID, '^[^.]+')) %>%
   dplyr::select(-Chr)
 
 XCI <- full_join(BallatonXCI, XCI, by=c('SYMBOL'='GeneName')) 
@@ -283,13 +283,15 @@ ggsave("../Paper/Fig5.pdf")
 Figure S1
 - PRKX is Male biased and not in the PAR. It is reported as Female biased in GTEx
 - NLGN4X is discrepent (according to Ballaton, it was found to be 100% E by Carrel & Willard; according to Tukiainen it was not tested (VE according to Cotton et al.))
+- No evidence of sex bias in new escape genes from GTEx
 ```{r}
 XCI_DE <- left_join(XCI, fittedBias, by='SYMBOL') %>% 
   mutate(sig=ifelse(padj<.1, 1,0)) %>%
   filter(SYMBOL != 'XIST')
+filter(XCI_DE, ! is.na(GTExStatus)) %>% dplyr::select(SYMBOL, GTExStatus, log2FoldDiff, padj)
 ggplot(XCI_DE, aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
     geom_jitter(height = 0, width=.25, alpha=.25) +
-    facet_grid(GTExStatus ~ .) +
+    facet_grid(CombinedXCIstatus ~ .) +
     main_theme() +
     scale_colour_manual(values=c("black", "red")) +
     ylab("Log2 Fold Difference") +
