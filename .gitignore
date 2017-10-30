@@ -66,3 +66,7 @@ Logs/*
 
 # info on setting up shiny app on server
 Shiny/GENEX-FB1/README.md
+
+# Snakemake DAG output
+DAG.svg
+
