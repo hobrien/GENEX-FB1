@@ -15,7 +15,7 @@ library(tidyverse)
 library(stringr)
 library(gridExtra)
 #library(clusterProfiler)
-#library(xlsx)
+library(xlsx)
 #library(EnsDb.Hsapiens.v86)
 #library(ggbio)
 #library(AnnotationFilter)
@@ -320,7 +320,7 @@ XCI_DE <- dplyr::filter(fittedBias, Chr=='chrX') %>%
                          )
          ) %>%
   filter(SYMBOL != 'XIST')
-filter(XCI_DE, Status == 'Unknown' & sig >0)
+filter(XCI_DE, Status == 'Unknown' & sig >0) %>% write_tsv("../Paper/NovelXCIescape.txt")
 
 ggplot(XCI_DE, aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
     geom_jitter(height = 0, width=.25, alpha=.25) +
@@ -576,12 +576,23 @@ write.xlsx2(as.data.frame(SampleInfo),
 
 Supplementary Table 5: X inactivation
 ```{r}
-inner_join(XCI, fittedBias) %>% 
-  dplyr::select(-Male, -Female, -Sex, -ChrType, -maxCooks) %>% 
-  dplyr::select(Id, everything()) %>%
-  mutate(Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
-  arrange(Status) %>%
-  as.data.frame() %>% View()
+dplyr::filter(fittedBias, Chr=='chrX') %>% 
+  #mutate(SYMBOL = ifelse(Id=='ENSG00000130021', 'HDHD1', SYMBOL)) %>%
+  left_join(XCI, by='SYMBOL') %>%
+  left_join(GTExDEG) %>% 
+  mutate(Status = factor(ifelse(is.na(Status),
+                                ifelse(is.na(GTExStatus),
+                                       "Unknown",
+                                       GTExStatus
+                                      ),
+                                Status),
+                         levels = c("Inactive", "Variable", "Escape", "PAR", "Unknown")
+                         )
+         ) %>%
+  dplyr::select(-Male, -Female, -Sex, -ChrType, -maxCooks, -GTExStatus) %>% 
+  dplyr::select(Id, everything()) %>% 
+  arrange(padj) %>%
+  as.data.frame() %>%
   write.xlsx2(file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS5',
