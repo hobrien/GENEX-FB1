@@ -37,7 +37,7 @@ cat /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/G
 
 To run Differential Expression:
 ```
-Bash Bash/RunDE.sh
+Bash Bash/RunDEanalyses.sh
 ```
 
 To rerun Differential Expression analyses with outliers removed:
