@@ -141,11 +141,10 @@ dev.off()
 # Figure 2.
 Numbers of sex-biased genes implicated at the gene-level and transcript-level analyses in males (M) and females (F). The majority of sex-biased transcripts (FDR < 0.1) originating from the sex chromosomes are annotated to genes that are detected as sex-biased at the gene level. Analyses at the transcript level identified sex-biased transcripts annotated to a further 79 autosomal genes that did not exhibit pronounced sex differences (FDR < 0.1) at the gene level. PAR = pseudoautosomal regions.
 ```{r}
-PARgenes <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/PARgenes.txt",
-"\t", escape_double = FALSE, trim_ws = TRUE)
-
-DEall <- left_join(DEall, dplyr::select(PARgenes, gene_name=`Approved Symbol`, PAR=Unknown)) %>%
-  mutate(ChrType=ifelse(is.na(PAR), ChrType, 'PAR'))
+DEall <- left_join(DEall, XCI, by=c('gene_name' = 'SYMBOL')) %>%
+  left_join(GTExDEG) %>% 
+  mutate(Status=ifelse(GTExStatus == 'PAR', 'PAR', Status),
+         ChrType = (ifelse(!is.na(Status) & Status == 'PAR', 'PAR', ChrType)))
 
 DEall %>% mutate(level=relevel(factor(ifelse(level=='both', 
                                       'Both gene and transcript level',
