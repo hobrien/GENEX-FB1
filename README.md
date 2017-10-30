@@ -47,3 +47,7 @@ source activate py35
 snakemake --cluster "qsub -l h_vmem={params.maxvmem}" -j 50
 ```
 
+To prepare data files for Shiny web app:
+```
+Rsciprt R/PrepareData.R
+```
