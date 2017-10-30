@@ -39,9 +39,6 @@ Python/.ipynb_checkpoints/*
 #Stupid Mac files
 *.DS_Store
 
-#Input data
-Data/*
-
 # Output files from scripts
 FastQC/*
 Counts/*
