@@ -5,7 +5,7 @@ date: "4/9/2017"
 output: html_document
 ---
 
-```{r, include=FALSE}
+```{r setup, include=FALSE}
 knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
                       echo=FALSE, 
                       warning=FALSE, 
@@ -13,9 +13,9 @@ knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
 
 library(tidyverse)
 library(stringr)
-#library(gridExtra)
+library(gridExtra)
 #library(clusterProfiler)
-library(xlsx)
+#library(xlsx)
 #library(EnsDb.Hsapiens.v86)
 #library(ggbio)
 #library(AnnotationFilter)
@@ -57,32 +57,48 @@ DEall <- inner_join(DEgenes, DEtranscripts) %>%
   left_join(dplyr::select(fittedBias, Id, gene_padj=padj)) %>%
   left_join(dplyr::select(fittedBias_topIsoform, Id=GeneId, transcript_padj=padj, Sex))
 
-XCIsummary <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/XCIsummary.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+GTExXCI <- read_delim("../Data/GTExXCI.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
 
-GTExXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExXCI.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
-
-GTExNovel <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExNovel.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+GTExNovel <- read_delim("../Data/GTExNovel.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
 
 NewFindings <- filter(GTExXCI, NewCall=='x') %>% 
   dplyr::rename(GeneName = Name) %>%
-  mutate(GTExStatus = 'variable') %>%
+  mutate(GTExStatus = 'Variable') %>%
   dplyr::select(GeneID, GeneName, Chr, Start, End, GTExStatus) %>%
   full_join(GTExNovel) %>%
-  mutate(GTExStatus = ifelse(is.na(GTExStatus), 'escape', GTExStatus))
+  mutate(GTExStatus = ifelse(is.na(GTExStatus), 'Escape', GTExStatus))
 
-BallatonXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
+BallatonXCI <- read_delim("../Data/BallatonXCI.txt",
 "\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
 trim_ws = TRUE)
 
-BallatonXCI <- group_by(BallatonXCI, SYMBOL) %>% dplyr::summarise(n=n()) %>% filter(n==1) %>% left_join(BallatonXCI) %>% dplyr::select(-n)
+XCI <- group_by(BallatonXCI, SYMBOL) %>% 
+  dplyr::summarise(n=n()) %>% 
+  filter(n==1) %>% 
+  left_join(BallatonXCI) %>% 
+  dplyr::select(-n) %>% 
+  mutate(Status=ifelse(Status %in% c("S", "Mostly S"), "Inactive",
+                       ifelse(Status %in% c("E", "Mostly E"), "Escape",
+                              ifelse(Status %in% c("VE", "Mostly VE"), "Variable",
+                                     ifelse(Status == 'PAR',
+                                            "PAR",
+                                            "Unknown")
+                                            )
+                              )
+                       )
+         ) %>%
+  full_join(NewFindings, by=c("SYMBOL" = "GeneName")) %>%
+  mutate(Status = ifelse(!is.na(GTExStatus), GTExStatus, Status)) %>%
+  dplyr::select(SYMBOL, Status)
 
-XCI <- dplyr::select(NewFindings, GeneID, GeneName, Chr, Start, End, GTExStatus) %>%
-  full_join(XCIsummary, by=c("GeneID", "GeneName", "Chr", "Start", "End")) %>%
-  mutate(CombinedXCIstatus=ifelse(is.na(GTExStatus), CombinedXCIstatus, GTExStatus), Id=str_extract(GeneID, '^[^.]+')) %>%
-  dplyr::select(-Chr)
-
-XCI <- full_join(BallatonXCI, XCI, by=c('SYMBOL'='GeneName')) %>%
-  left_join(dplyr::select(GTExXCI, GeneID, Region)) 
+GTExDEG <- read_delim("../Data/GTExDEG.txt", 
+                      "\t", 
+                      escape_double = FALSE, 
+                      col_names = TRUE, 
+                      trim_ws = TRUE) %>% 
+  mutate(GTExStatus = ifelse(region=='PAR', 'PAR', category),
+         `Gene ID` = str_extract( `Gene ID`, '^[^.]+')) %>%
+  dplyr::select(Id=`Gene ID`, GTExStatus)
 ```
 
 Figure 1.
@@ -285,29 +301,38 @@ Figure S1
 - PRKX is Male biased and not in the PAR. It is reported as Female biased in GTEx
 - NLGN4X is discrepent (according to Ballaton, it was found to be 100% E by Carrel & Willard; according to Tukiainen it was not tested (VE according to Cotton et al.))
 - No evidence of sex bias in new escape genes from GTEx
-- Can't use the PAR/Non-PAR classification from GTEx table 13 because it only includes a subset of the genes in table 1 for some reason. Instead, I'm goin to borrow the PAR category from Ballaton.
+- ENSG00000228906 (RP13-216E22.4) is in Xinactivation.txt
+- AL672277.1/ENSG00000237531, is expressed at a low level in both sexes, but a higher level in females. I've confirmed that it is in PAR1
+
 ```{r}
-XCI_DE <- left_join(XCI, fittedBias, by='SYMBOL') %>% 
-  mutate(sig=ifelse(padj<.1, ifelse(log2FoldDiff > 0, 1, 2), 0)) %>%
+XCI_DE <- dplyr::filter(fittedBias, Chr=='chrX') %>% 
+  #mutate(SYMBOL = ifelse(Id=='ENSG00000130021', 'HDHD1', SYMBOL)) %>%
+  full_join(XCI, by='SYMBOL') %>%
+  full_join(GTExDEG) %>% 
+  mutate(sig=ifelse(padj<.1, ifelse(log2FoldDiff>0, 1, 2), 0),
+         Status = factor(ifelse(is.na(Status),
+                                ifelse(is.na(GTExStatus),
+                                       "Unknown",
+                                       GTExStatus
+                                      ),
+                                Status),
+                         levels = c("Inactive", "Variable", "Escape", "PAR", "Unknown")
+                         )
+         ) %>%
   filter(SYMBOL != 'XIST')
+filter(XCI_DE, Status == 'Unknown' & sig >0)
 
-XCI_DE <- mutate(XCI_DE, CombinedXCIstatus = ifelse(Status=='PAR', 'PAR', CombinedXCIstatus))
-
-filter(XCI_DE, ! is.na(GTExStatus)) %>% dplyr::select(SYMBOL, GTExStatus, log2FoldDiff, padj)
-
-XCI_DE %>% filter(!is.na(CombinedXCIstatus)) %>% 
-  mutate(CombinedXCIstatus=factor(CombinedXCIstatus, levels=c('inactive', 'variable', 'escape', 'PAR'))) %>%
-  ggplot(aes(x=CombinedXCIstatus, y=log2FoldDiff, colour=factor(sig))) +
-    geom_jitter(height = 0, width=.25, alpha=.5) +
+ggplot(XCI_DE, aes(x=Status, y=log2FoldDiff, colour=factor(sig))) +
+    geom_jitter(height = 0, width=.25, alpha=.25) +
     main_theme() +
     scale_colour_manual(values=c("black", "blue", "red")) +
-    ylab("<--- Female-biased        Male-biased --->") +
-    xlab("reported X-inactivation status") +
-    theme(axis.text.x=element_text(size=9, angle=45, hjust=1),
+    ylab("Log2 Fold Difference\n<--- Female-biased                                                      Male-biased --->") +
+    xlab("Reported X-Inactivation Status") +
+    theme(axis.text.x=element_text(size=12, angle=45, hjust=1),
           axis.text.y=element_text(size=9),
           axis.title.x=element_text(size=12),
           axis.title.y=element_text(size=12))
-ggsave("../Paper/FigS1.pdf")   
+ggsave("../Paper/FigS1.pdf")    
 ```
 
 Enrichment Analysis
@@ -551,11 +576,12 @@ write.xlsx2(as.data.frame(SampleInfo),
 
 Supplementary Table 5: X inactivation
 ```{r}
-XCI_DE %>%  dplyr::select(GeneID, SYMBOL, Status=CombinedXCIstatus, log2FoldDiff, pvalue, padj) %>% 
-  filter(!is.na(padj) & !is.na(Status)) %>% 
-  arrange(padj) %>% 
-  mutate(GeneID = str_extract(GeneID, '^[^.]+')) %>% 
-  as.data.frame() %>% 
+inner_join(XCI, fittedBias) %>% 
+  dplyr::select(-Male, -Female, -Sex, -ChrType, -maxCooks) %>% 
+  dplyr::select(Id, everything()) %>%
+  mutate(Status=factor(Status, levels=c("E", "Mostly E", "VE",  "Mostly VE", "Mostly S", "S", "PAR", "No call", "Discordant" ))) %>%
+  arrange(Status) %>%
+  as.data.frame() %>% View()
   write.xlsx2(file="../Tables/SupplementalTables.xlsx", 
             row.names=FALSE,
             sheetName='TblS5',
