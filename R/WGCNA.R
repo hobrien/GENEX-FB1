@@ -7,109 +7,112 @@
 ################################################################################
 ###                parameters: to be modified by the user                    ###
 ################################################################################
+#setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
 
 option_list <- list(
-  make_option(c("-n", "--name"), type="character", default="Sex", 
+  make_option(c("-v", "--varInt"), type="character", default="Sex,PCW", 
+              help="Variables of interest (Sex and PCW)"),
+  make_option(c("-n", "--name"), type="character", default="Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts_RIN_excl17046_s50_p7_c30_m10", 
               help="Project name"),
-  make_option(c("-m", "--min"), type="integer", default=12, 
-              help="minimum age (PCW)", metavar="minimum age"),
-  make_option(c("-x", "--max"), type="integer", default=13, 
-              help="maximum age (PCW)", metavar="maximum age"),
-  make_option(c("-r", "--rin"), type="numeric", default=NA, 
-              help="minimum RIN", metavar="minimum RIN"),
-  make_option(c("-p", "--pvalue"), type="numeric", default=0.1, 
-              help="corrected pvalue cutoff", metavar="pvalue"),
-  make_option(c("-c", "--cofactor"), type="character", default="", 
-              help="Cofactors (either Sex or PCW)"),
-  make_option(c("--male"), type="integer", default=NULL, 
-              help="number of male samples"),
-  make_option(c("--female"), type="integer", default=NULL, 
-              help="number of female samples"),
-  make_option(c("-b", "--batch"), type="character", default="RIN,ReadLength", 
+  make_option(c("-o", "--outfolder"), type="character", default="/Volumes/FetalRNAseq/WGCNA", 
+              help="Folder for output"),
+  make_option(c("-i", "--input"), type="character", default="Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/counts_vst.txt", 
+              help="Input counts"),
+  make_option(c("-l", "--library"), type="character", default="Data/SampleInfo.txt", 
+              help="Library info file (must contain batch effects)"),
+  make_option(c("-b", "--batch"), type="character", default="ReadLength", 
               help="factors to be used as batch correction"),
-  make_option(c("-t", "--tool"), type="character", default="DESeq", 
-              help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
-  make_option(c("-e", "--exclude"), type="character", default='', 
+  make_option(c("-c", "--covariate"), type="character", default="RIN", 
+              help="numeric cofactors to be corrected for"),
+  make_option(c("-e", "--exclude"), type="character", default='17046', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
-  make_option(c("-s", "--sex_chromosomes"), action='store_true', type="logical", default=FALSE, 
-              help="Exclude sex chromosomes", metavar="sex_chromosomes"),
-  make_option(c("-i", "--interaction"), type="character", default="", 
-              help="Cofactors to interact with varInt", metavar = 'interact'),
-  make_option(c("-f", "--feature"), type="character", default="genes", 
-              help="Type of feature to Analyse (genes, junctions, transcripts)"),
-  make_option(c("--sva"), type="integer", default=0, 
-              help="Number of Surrogate Variables to estimate"),
-  make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
-              help="Use counts derived from Kallisto")
+  make_option(c("-p", "--power"), type="integer", default=7, 
+              help="power"),
+  make_option(c("-m", "--min"), type="numeric", default=10, 
+              help="minimum average transformed count (3.550576 = 0 untransformed)"),
+  make_option(c("-c", "--cut"), type="numeric", default=.3, 
+              help="mergeCutHeight"),
+  make_option(c("-s", "--size"), type="numeric", default=50, 
+              help="minimum cluster size"),
+  make_option(c("-q", "--quantile"), action='store_true', type="logical", default=FALSE, 
+              help="Use quantile normalisation")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
 opt <- parse_args(opt_parser)
 
 
-projectName <- "MvsF_12_20_noA_excl_15641_16491_18432_norm_no_batch_no_RIN"                         # name of the project
+projectName <- opt$name                        # name of the project
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
 
-workDir <- paste("~/BTSync/FetalRNAseq/WGCNA", projectName, sep='/')      # working directory for the R session
+workDir <- opt$outfolder      # working directory for the R session
 
-inputDir <- "~/BTSync/FetalRNAseq/Counts/MvsF_12_20_noA_excl_15641_16491_18432_norm"
+#inputDir <- "~/BTSync/FetalRNAseq/Counts/MvsF_12_20_noA_excl_15641_16491_18432_norm"
 
-#inputCounts <- "VST_filtered.txt" #unfiltered Variance Stabalising Transformation of normalised counts
-inputCounts <- "edgeR_no_batch_no_RIN.txt" #filter out genes with counts < 10 in more than 10% of samples
-#inputCounts <- "VST_filtered2.txt" #filter out genes with counts < 10 in more than 50% of samples
+inputCounts <- opt$input #filter out genes with counts < 10 in more than 10% of samples
 
-batch <- c()#"Centre", "RIN")                  
-quantile_norm <- FALSE#TRUE
+batch <- strsplit(opt$batch, ',')[[1]]
+covar <- strsplit(opt$covariate, ',')[[1]] 
+varInt <- strsplit(opt$varInt, ',')[[1]]
+design=formula(paste("~", paste(varInt, collapse= ' + ')))
+quantile_norm <- opt$quantile
+exclude <- strsplit(opt$exclude, ',')[[1]]
 
 ################################################################################
 ###                             running script                               ###
 ################################################################################
 
 library(WGCNA)
-library(readr)
-library(dplyr)
-library(sva)
+library(tidyverse)
+#library(sva)
+library(limma)
 library(preprocessCore)
 allowWGCNAThreads()
 options(stringsAsFactors = FALSE)
 
 dir.create(workDir)
-dir.create(paste(workDir, 'figures', sep='/'))
-setwd(workDir)
-getwd()
+dir.create(paste(workDir, opt$name, sep='/'))
+dir.create(paste(workDir, opt$name, 'figures', sep='/'))
 
 # Prepare data for analysis
-MalevsFemale <- read_delim(paste(inputDir, inputCounts, sep='/'), "\t", escape_double = FALSE, trim_ws = TRUE)
+MalevsFemale <- read_delim(paste(inputCounts, sep='/'), "\t", escape_double = FALSE, trim_ws = TRUE)
+if (length(exclude) > 0) {
+  MalevsFemale <- select(MalevsFemale, -one_of(exclude))
+}
 #move Id to rownames
+MalevsFemale <- as.data.frame(MalevsFemale)
 rownames(MalevsFemale) <- MalevsFemale$Id
-MalevsFemale <- select(MalevsFemale, -Id) 
-
-dim(MalevsFemale)
-names(MalevsFemale)
+MalevsFemale <- MalevsFemale[,-1] 
 
 #Add trait info
-sample_info <- read.delim("~/BTSync/FetalRNAseq/LabNotes/sample_info.txt") %>%
-  select(BrainBankID, Sex, PCW, RIN)
-sample_info <- read.delim("~/BTSync/FetalRNAseq/LabNotes/SampleProgress.txt") %>%
-  select(sample, Centre) %>%
-  left_join(sample_info, by = c("sample" = "BrainBankID"))
-SampleNames <- colnames(MalevsFemale);
-traitRows = match(SampleNames, sample_info$sample);
-datTraits = sample_info[traitRows, -1];
-rownames(datTraits) = sample_info[traitRows, 1];
+sample_info <- read_delim("Data/SampleInfo.txt",
+                          "\t", escape_double = FALSE, col_types = cols(Sample = col_character()),
+                          trim_ws = TRUE)
+#sample_info <- select(sample_info, -one_of(exclude))
+datTraits <- data.frame(Sample=as.character(colnames(MalevsFemale)))
+datTraits <- left_join(datTraits, sample_info) %>% 
+  as.data.frame()
+rownames(datTraits) <- datTraits$Sample
+datTraits <- datTraits[,-1]
 collectGarbage()
 
-datTraits$Sex <- as.numeric(as.factor(datTraits$Sex))
-datTraits$Centre <- as.numeric(as.factor(datTraits$Centre))
+setwd(paste(workDir, opt$name, sep='/'))
 
+datTraits$Sex <- as.numeric(as.factor(datTraits$Sex))
+datTraits$ReadLength <- as.numeric(as.factor(datTraits$ReadLength))
+datTraits <- subset(datTraits, select=-c(Sequencer))
+
+MalevsFemale <- MalevsFemale %>% filter( Reduce(`+`, .)/dim(MalevsFemale)[2] > opt$min)
 #Correct for batch effects (see http://jtleek.com/genstats/inst/doc/02_13_batch-effects.html)
-if ('Centre' %in% batch) {
-    batch <- datTraits$Centre
-    modcombat = model.matrix(~1, data=datTraits)
-    MalevsFemale = ComBat(dat=MalevsFemale, batch=batch, mod=modcombat, par.prior=TRUE, prior.plots=FALSE)
-}
+#if ('ReadLength' %in% batch) {
+#    batchLevel <- datTraits$ReadLength
+#    modcombat = model.matrix(~RIN, data=datTraits)
+#    MalevsFemale = ComBat(dat=MalevsFemale, batch=batchLevel, mod=modcombat, par.prior=TRUE, prior.plots=FALSE)
+#}
+
+MalevsFemale <- removeBatchEffect(MalevsFemale, batch=datTraits[,batch], design=model.matrix(design, data=datTraits), covariates=datTraits[,covar]) 
 
 if (quantile_norm) {
     MalevsFemale <- normalize.quantiles(as.matrix(MalevsFemale),copy=TRUE)
@@ -177,9 +180,9 @@ plot(sft$fitIndices[,1], sft$fitIndices[,5],
 text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
 dev.off()
 
-net = blockwiseModules(datExpr0, power = 10, maxBlockSize = 20000,
-                       TOMType = "unsigned", minModuleSize = 30,
-                       reassignThreshold = 0, mergeCutHeight = 0.25,
+net = blockwiseModules(datExpr0, power =opt$power, maxBlockSize = 20000,
+                       TOMType = "unsigned", minModuleSize = opt$size,
+                       reassignThreshold = 0, mergeCutHeight = opt$cut,
                        numericLabels = TRUE, pamRespectsDendro = FALSE,
                        saveTOMs = TRUE,
                        saveTOMFileBase = "MalevsFemaleFilter_8TOM",
