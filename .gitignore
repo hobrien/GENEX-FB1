@@ -55,14 +55,14 @@ Paper/*
 Shiny/GENEX-FB1/Data
 TempFiles/*
 
-# Shinyapp.io info
-Shiny/GENEX-FB1/rsconnect
-
 # SARTools fork
 R/SARTools
 
 # Log files
 Logs/*
+
+# Shinyapp.io info
+Shiny/GENEX-FB1/rsconnect
 
 # info on setting up shiny app on server
 Shiny/GENEX-FB1/README.md
