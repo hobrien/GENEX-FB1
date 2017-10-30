@@ -5,7 +5,6 @@
 ### designed to be executed with a modified version of SARTools 1.3.0 
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
-#setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")

@@ -8,7 +8,6 @@ output:
 <!-- see http://rstudio.github.io/tufte/ for info about tufte -->
 <!-- type Rscript -e "library(rmarkdown); render('BamQC.rmd')" to knit to html on the server -->
 ```{r setup, include=FALSE}
-setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 knitr::opts_knit$set(echo = FALSE, root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
 library(tidyr)
 library(ggplot2)

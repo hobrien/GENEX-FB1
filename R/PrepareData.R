@@ -3,14 +3,6 @@ library(stringr)
 library(biomaRt)
 library(yaml)
 
-# Oh yes, thought of a catchy (and hopefully memorable) name for the dataset: 
-# GENEX-FB (for GENe EXpression in the Fetal Brain). 
-# This dataset would be GENEX-FB1: Sex biases. 
-# The larger dataset for eQTL / TWAS analysis (I reckon we'll get up to 150) would be GENEX-FB2: 
-# Genotypic effects. (If we grew the sample, we'd call it FB3 etc). 
-# We could also use GENEX for the adult brain samples (E.g. GENEX-AC (adult caudate)!
-# setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
-
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
                          dataset = "hsapiens_gene_ensembl",
                          host = 'ensembl.org')
@@ -94,7 +86,5 @@ for (samples in names(outliers$transcript_level)) {
 
 write_tsv(counts12_20_tr, "Shiny/GENEX-FB1/Data/counts12_20_tr.txt")
 
-
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
 
-#SampleInfo <- read_tsv("Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
