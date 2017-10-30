@@ -20,6 +20,8 @@ vignettes/*.pdf
 # html output from knitR
 R/*.html
 R/*.pdf
+R/*.knit.md
+R/*.utf8.md
 
 # R lib files
 R/libs/*
@@ -37,16 +39,34 @@ Python/.ipynb_checkpoints/*
 #Stupid Mac files
 *.DS_Store
 
-# Results folder
-Results/*
+#Input data
+Data/*
 
-# Count data
-Shiny/GENEX-FB1/Data
+# Output files from scripts
+FastQC/*
 Counts/*
+Mappings/*
+Results/*
+Kallisto/*
+Figures/*
+Tables/*
+Documents/*
+Paper/*
+Shiny/GENEX-FB1/Data
+TempFiles/*
 
 # Shinyapp.io info
 Shiny/GENEX-FB1/rsconnect
 
 # SARTools fork
 R/SARTools
+
+# Log files
+Logs/*
+
+# info on setting up shiny app on server
+Shiny/GENEX-FB1/README.md
+
+# Snakemake DAG output
+DAG.svg
 

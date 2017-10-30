@@ -1,0 +1,63 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(stringr)
+
+LibraryInfo <- read_tsv("../Data/SampleInfo.txt", 
+                        col_types=cols(Sample='c')
+                       ) %>%
+full_join(read_tsv("../Data/experiment.txt", 
+                        col_types=cols(Sample='c')
+                       ), by="Sample"
+          )
+
+QoRTs <- read_delim("../Results/QoRTs.txt", 
+     "\t", escape_double = FALSE, col_names = FALSE, 
+     trim_ws = TRUE)
+
+colnames(QoRTs)<-c('Sample', 'stat', 'value')
+
+QoRTs <- spread(QoRTs, stat, value) %>% 
+  mutate(strand_ratio=frFirstStrand/frSecondStrand, BrainBankID = str_replace(Sample, '-.*', '')) %>% 
+  gather(stat, value, -Sample, -STRANDEDNESS_MATCHES_INFERRED, -strand_ratio, -BrainBankID) %>%
+  group_by(Sample) %>% 
+  mutate(proportion=value/sum(value)) %>% 
+  ungroup() %>%
+  left_join(LibraryInfo, by=c('BrainBankID' = 'Sample'))
+
+
+filter(QoRTs, stat=='frSecondStrand') %>% 
+  arrange(desc(proportion)) %>% 
+  group_by(ReadLength) %>%
+  mutate(SampleNum=row_number()) %>% 
+  ungroup() %>% 
+  dplyr::select(Sample, SampleNum) %>% 
+  full_join(QoRTs) %>% 
+  ggplot(aes(x=SampleNum, y=proportion, fill=stat, colour=factor(STRANDEDNESS_MATCHES_INFERRED))) +
+  geom_histogram(stat='identity') + 
+  facet_grid(ReadLength ~ .) +
+  theme(legend.title=element_blank()) +
+  theme(legend.position = "bottom")
+
+QoRTs %>% group_by(Sample) %>% 
+  dplyr::slice(1) %>% 
+  ungroup() %>%
+  arrange(strand_ratio) %>%
+  mutate(SampleNum=row_number()) %>% 
+  ggplot(aes(x=SampleNum, y=strand_ratio, fill=factor(STRANDEDNESS_MATCHES_INFERRED)))+geom_bar(stat='identity') +
+  theme(legend.title=element_blank()) +
+  theme(legend.position = "bottom")
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).

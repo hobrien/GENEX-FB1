@@ -1,0 +1,130 @@
+---
+title: "Data QC"
+author: "Heath O'Brien"
+output:
+  tufte::tufte_html: default
+  #tufte::tufte_handout: default
+---
+<!-- see http://rstudio.github.io/tufte/ for info about tufte -->
+<!-- type Rscript -e "library(rmarkdown); render('BamQC.rmd')" to knit to html on the server -->
+```{r setup, include=FALSE}
+setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+knitr::opts_knit$set(echo = FALSE, root.dir="~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(readr)
+library(gridExtra)
+library(RColorBrewer)
+library(tufte)
+rm(list=ls())
+source("Shiny/GENEX-FB1/FormatGGplot.R")
+LibraryInfo <- read_tsv("Data/SampleInfo.txt", 
+                        col_types = cols(.default = col_character())
+                       )
+RSeQCstats <- read_tsv("Tables/read_numbers.txt", col_types = cols(sample = 'c'))
+ReadNumbers <- select(RSeQCstats, sample, Unique)
+RSeQCstats <- RSeQCstats %>% mutate(sample = str_extract(sample, "^[^-]+")) %>% group_by(sample) %>% summarise_each("sum")
+
+```
+
+# RSeQC
+## Mapping Stats
+`r margin_note("- rDNA reads not included in first three stats")`
+`r margin_note("- # uniquely mapped reads ranges from 57 million to 446 million, with 3 samples (17054, 17160, 15483) having < 100 million")`
+`r margin_note("- % rRNA ranges from 0.1% to 56%, with 4 samples (17054, 17160, 18655, 16428) having > 40%")`
+
+``` {r }
+#bam_stat.py
+RSeQCstats <- dplyr::select(LibraryInfo, sample=Sample, ReadLength) %>% full_join(RSeQCstats, by='sample')
+knitr::kable(
+  bind_cols(RSeQCstats[,1:2], as.data.frame(sapply(RSeQCstats[,3:6], function(x) formatC(as.numeric(x), format='d', big.mark=','))))
+)
+```
+
+
+## Distribution of Reads Among Features (proportion of tags mapping to different feature classes)
+`r margin_note("- Intergenic only considers sequence within 10 kb upstream of TSS and downstream of TES")`
+`r margin_note("- Exons enriched >10 fold relative to introns")`
+`r margin_note("- Introns enriched >10 fold relative to Intergenic")`
+`r margin_note("- 1/3rd to 2/3rd of tags map to introns. 2-4% map to intergenic (except for 17198 which is 13% intergenic)")`
+`r margin_note("- Number of tags per read ranges from 1.1 to 1.8, except for 17198, which has 0.8")`
+`r margin_note("- 17198, also has the highest proportion of intronic and intergenic sequence and the lowest proportion of CDS and second lowest of UTR")`
+`r margin_note("- I wonder if this might be an indeciation of DNA contamination?")`
+
+
+``` {r }
+#read_distribution.py
+RSeQCdistribution <- read_tsv("Tables/read_distribution.txt", col_types = cols(sample = 'c'))
+RSeQCdistribution <- dplyr::select(LibraryInfo, sample=Sample, ReadLength) %>% full_join(RSeQCdistribution, by='sample')
+RSeQCdistribution <- dplyr::select(RSeQCstats, sample, Unique) %>% 
+  full_join(RSeQCdistribution, by='sample') %>%
+  mutate(tags_per_read=`Total Tags`/Unique) %>%
+  dplyr::select(sample, ReadLength, tags_per_read, CDS, UTR, Intron, Intergenic)
+knitr::kable(
+  RSeQCdistribution
+)
+
+
+```
+
+## Strand
+
+`r margin_note("- Data consistent with second-strand experiment")`
+
+```{r }
+RSeQCexpt <- read_tsv("Tables/read_strand.txt", col_types = cols(sample = 'c'))
+RSeQCexpt <- dplyr::select(LibraryInfo, sample=Sample, ReadLength) %>% full_join(RSeQCexpt, by='sample')
+
+knitr::kable(
+    RSeQCexpt
+)
+
+```
+
+## Insert Size Distribution
+
+`r margin_note("- Sharp peaks indicate that most fragments are shorter than the read length")`
+`r margin_note("- Inner distance pretty consistenly at - 125 for Edinbrugh data, but centered at about -50 for Exeter data")`
+`r margin_note("- This indicates that fragment size tends to be around 125-150 bp")`
+
+
+
+```{r dev.args = list(bg = 'transparent')}
+RSeQCdistance <- read_tsv("Tables/read_distance.txt", col_types = cols(sample = 'c'))
+RSeQCdistance <- dplyr::select(LibraryInfo, sample=Sample, ReadLength) %>% full_join(RSeQCdistance, by='sample')
+
+ggplot(RSeQCdistance, aes(x=size, y=count, colour=ReadLength, group=sample)) +
+  geom_line() +
+  ylab('reads') +
+  xlab('inner distance') +
+  scale_colour_brewer(type = "qual", palette = 6) +
+  main_theme() +
+  theme(legend.position=c(.8,.8))
+
+```
+
+## Splice Junction Saturation
+
+`r margin_note("- It looks like both known and novel splice sites continue to be found")`
+
+```{r dev.args = list(bg = 'transparent'), warning=FALSE}
+RSeQCsat <- read_tsv("Tables/junction_sat.txt", col_types = cols(sample = 'c'))
+RSeQCsat <- RSeQCsat %>% mutate(BrainBankID=str_extract(sample, "^[^-]+")) %>%
+  full_join(dplyr::select(LibraryInfo, BrainBankID=Sample, ReadLength), by='BrainBankID') %>% 
+  full_join(ReadNumbers) %>%
+  dplyr::select(-BrainBankID)
+
+ggplot(RSeQCsat, aes(y=junctions, x=Unique*percent_reads/100, group=sample, colour=ReadLength)) +
+  geom_point() +
+  #xlim(c(0,500)) +
+  #scale_y_log10() +
+  scale_colour_brewer(type = "qual", palette = 6) +
+  main_theme() +
+  theme(legend.position=c(.9,.9)) +
+  facet_wrap(~ Category, scales='free') +
+  theme(axis.text.x=element_text(angle=-90)) +
+  xlab("Number of Reads")
+```
+  

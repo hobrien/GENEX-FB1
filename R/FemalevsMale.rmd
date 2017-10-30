@@ -1,0 +1,1064 @@
+---
+title: "Female vs Male"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, 
+                      warning=FALSE, 
+                      message=FALSE)
+library(tidyverse)
+library(gridExtra)
+#library(clusterProfiler)
+#library(GGally)
+library(stringr)
+#library(matrixStats)
+library(ggbiplot)
+library(stringr)
+library(genefilter)
+library(biomaRt)
+library(ggbio)
+#setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/")
+source("../Shiny/GENEX-FB1/FormatGGplot.R")
+
+LibraryInfo <- read_tsv("../Data/SampleInfo.txt", 
+                        col_types=cols(Sample='c')
+                       ) %>%
+full_join(read_tsv("../Data/experiment.txt", 
+                        col_types=cols(Sample='c')
+                       ), by="Sample"
+          )
+
+par <- read_tsv("../Data/PARgenes.txt")
+
+all_gene_info <- read_tsv("../Data/genes.txt", col_types = cols(
+  seqid = col_character(),
+  source = col_character(),
+  feature = col_character(),
+  start = col_integer(),
+  end = col_integer(),
+  score = col_character(),
+  strand = col_integer(),
+  frame = col_character(),
+  gene_id = col_character(),
+  gene_type = col_character(),
+  gene_status = col_character(),
+  gene_name = col_character()
+)) %>%
+  mutate(Id = sub("\\.[0-9]+", "", gene_id),
+         ChrType = ifelse(gene_name %in% par$`Approved Symbol`, 'PAR', ifelse(seqid == 'chrX' | seqid == 'chrY', seqid, 'autosomal'))
+         )
+gene_info <- all_gene_info %>% dplyr::select(Id, SYMBOL=gene_name, Chr=seqid, ChrType, gene_type)
+
+MalevsFemale_complete <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/MalevsFemale.complete.txt")%>%
+  mutate(Id = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', Id))
+
+MalevsFemale_complete <- right_join(gene_info, MalevsFemale_complete)
+count_matrix <- MalevsFemale_complete %>%
+  dplyr::select(-Id, -SYMBOL, -Chr, -starts_with('norm'), -baseMean, -Female, -Male, -FC, -log2FoldChange, -pvalue, -padj, -tagwise.dispersion, -trended.dispersion, -Chr, -ChrType, -gene_type)
+
+DESeqfit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  DESeqfit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(DESeqfit)
+}
+DESeqfit <- DESeqfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='DESeq',
+         analysis=paste0(Id, ageBin)) %>%
+  left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
+sigGenesDESeq <- DESeqfit %>% filter(padj < .1 )
+
+EdgeRfit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_EdgeR/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  EdgeRfit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_EdgeR/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+    mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(EdgeRfit)
+}
+EdgeRfit <- EdgeRfit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='EdgeRfit',
+         analysis=paste0(Id, ageBin)) %>%
+ left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
+
+sigGenesEdgeR <- EdgeRfit %>% filter(padj < .1 )
+
+sigGenes <- semi_join(sigGenesEdgeR, dplyr::select(sigGenesDESeq, analysis), by='analysis') %>% 
+  mutate(Method='Both') %>%
+  bind_rows(anti_join(sigGenesEdgeR, dplyr::select(sigGenesDESeq, analysis), by='analysis')) %>%
+  bind_rows(anti_join(sigGenesDESeq, dplyr::select(sigGenesEdgeR, analysis), by='analysis')) %>%
+  mutate(ageBin=relevel(factor(ageBin), ref='12-19'))
+
+
+PlotFC_by_ChrType <- function(genes, set_name) {
+  genes <- filter(genes, ageBin != '12_19' & ageBin != '12-19') %>%
+    mutate(week = ifelse(ageBin=='15_16' | ageBin=='15-16', 
+                         15.5, 
+                         ifelse(ageBin=='17_19' | ageBin=='17-19', 
+                                18, 
+                                as.numeric(ageBin)
+                                )
+                         )
+           )
+  plot <- ggplot(genes, aes(x=week, y=log2FoldChange, group=Id)) +
+    geom_line(alpha=1, aes(colour=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) +
+    geom_point(colour='black', size=1, alpha=.25, data=filter(genes, padj<.1)) +
+    scale_x_continuous(breaks=c(12,13,14,15.5,18), labels=c('12', '13', '14', '15-16', '17-19')) +
+    scale_colour_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) + 
+    main_theme() +
+    ylab("<--- Female-biased        Male-biased --->") +
+    xlab("Post Conception Week") +
+    theme(axis.title.y=element_text(size=9)) +
+    ggtitle(paste("Log fold differences in", set_name))
+  plot        
+}
+
+Sleuth <- read_delim("../Results/SleuthGenePCW_RIN.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+Sleuth <- dplyr::rename(Sleuth, Id=target_id)
+Sleuth <- right_join(gene_info, Sleuth)
+
+SleuthIsoform <- read_delim("../Results/SleuthPCW_RIN_annotated.txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+
+#select the transcript for each gene with the lowest qvalue
+SleuthTopIsoform <- SleuthIsoform %>% group_by(Id) %>% arrange(qval) %>% dplyr::slice(1) %>% ungroup()
+
+fittedBias <- read_tsv("../Shiny/GENEX-FB1/Data/fitted.txt") %>% left_join(dplyr::select(gene_info, Id, gene_type))
+fittedBias_tr <- read_tsv("../Shiny/GENEX-FB1/Data/fitted_tr.txt")  %>% left_join(dplyr::select(gene_info, Id, gene_type))
+fittedBias_topIsoform <- fittedBias_tr %>% group_by(Id) %>% arrange(padj) %>% dplyr::slice(1) %>% ungroup()
+#left_join(fittedBias_topIsoform, dplyr::select(gene_info, Id, gene_type), by=c('GeneID'))
+```
+
+## Histogram of sample size per week/sex
+```{r}
+
+LibraryInfo %>% group_by(Sex) %>% summarise(mean(PCW))
+layout(matrix(c(1,2), 2, byrow = TRUE))
+p1 <- ggplot(LibraryInfo, aes(x=PCW, fill=Analysis)) +
+  geom_bar() +
+  facet_grid(Sex ~ .) +
+  main_theme() +
+  scale_y_continuous(breaks=seq(0,100, 2)) +
+  scale_x_continuous(breaks=seq(11,19, 1)) +
+  xlab("Post Conception Weeks") +
+  theme(axis.text.x=element_text(size=8)) +
+  scale_fill_brewer(type = "qual", palette = 6) 
+
+LibraryInfo <- mutate(LibraryInfo, age_bin =ifelse(LibraryInfo$PCW < 15, LibraryInfo$PCW,
+                                     ifelse(LibraryInfo$PCW < 17, '15-16', '17-19')))
+dplyr::select(LibraryInfo, age_bin, Sex) %>% table()
+p2 <- ggplot(LibraryInfo, aes(x=age_bin, fill=Analysis )) +
+  geom_bar() +
+  facet_grid(Sex ~ .) +
+  main_theme() +
+  scale_y_continuous(breaks=seq(0,100, 2)) +
+  #scale_x_continuous(breaks=c(11,12,13,14,15,16),
+  #                   labels=c('11','12','13','14','15-16','17-19')) +
+  xlab("Post Conception Weeks") +
+  theme(axis.text.x=element_text(size=8)) +
+  theme(legend.position='right') +
+  scale_fill_brewer(type = "qual", palette = 6) 
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+
+## R Markdown
+
+- 51 million - 353 million read pairs (14 billion total)
+- 28 million - 252 million properly mapped pairs (10.7 billion total)
+- 5.3 million - 114 million read pairs included in counts matrix (3.5 billion total)
+
+- Samples with < 10 million read pairs in count matrix:
+    - 17046 (12 PCW) has 78% of reads mapping to rDNA
+    - 18655 (13 PCW) has relatively low sequencing depth (78 million read pairs) once I exluded the first batch of sequence because I don't know how to combine technical replicates with different batch effects. It also has a lot of ribosomal
+    
+- one additional samples with <10% of read pairs in count matrix has ~50% of reads mapping to rDNA (16428)
+
+- 11971 (17 PCW) has 671 million read pairs and >450 million in count matrix
+
+
+```{r }
+Counts <- count_matrix %>% 
+  tidyr::gather(Sample, Count) %>% 
+  mutate(Sample = as.character(Sample)) %>% 
+  group_by(Sample) %>%
+  dplyr::summarise(TotalCount=sum(Count))
+
+lengths <- read_delim("../FastQC/seq_lengths.txt", 
+                      delim='\t', 
+                      col_names=c('read_file', 'num_reads'), 
+                      col_types=cols(read_file='c', num_reads='i')
+                      )
+SeqInfo <- read_delim("../Data/sequences.txt", 
+                     delim='\t',
+                     col_names=c('read_file', 'read_group', 'centre', 'folder', 'trimmed'),
+                     col_types=cols(read_file='c', read_group='c', centre='c', folder='c', trimmed='c')
+                     )
+
+
+combined <- left_join(SeqInfo, lengths, by='read_file') %>%
+  separate(read_group, c('Sample', 'run'), fill='right', remove=FALSE) %>%
+  filter(grepl('_1$', read_file) | grepl('_R1_', read_file))
+
+mapping_stats <- read_tsv("../Tables/read_numbers.txt",
+                          col_types = cols(sample = 'c'),
+                          trim_ws = TRUE) %>%
+  mutate(sample = str_extract(sample, "^[^-]+")) %>% 
+  group_by(sample) %>% 
+  summarise_each("sum")
+
+
+total_reads <- combined %>%
+  group_by(Sample) %>%
+  dplyr::summarise(TotalFragments=sum(as.numeric(num_reads)))
+
+final_stats <- total_reads %>%
+  full_join(mapping_stats, by=c('Sample' = 'sample')) %>%
+  right_join(Counts) %>% 
+  mutate(MappedFragments = Paired/2, rDNA_Fragments= floor(rDNA/2)) %>%
+  dplyr::select(Sample, TotalFragments, rDNA_Fragments, MappedFragments, TotalCount) %>%
+  mutate(perc_rDNA = rDNA_Fragments/TotalFragments*100,
+         perc_mapped = MappedFragments/TotalFragments*100,
+         perc_counted = TotalCount/TotalFragments*100)
+
+final_stats %>% arrange(TotalCount)
+final_stats %>%
+  dplyr::select(TotalFragments, MappedFragments, TotalCount) %>%
+  summarise(TotalFragments=sum(as.numeric(TotalFragments))/1000000000,
+            MappedFragments=sum(as.numeric(MappedFragments)/1000000000),
+            TotalCount=sum(as.numeric(TotalCount)/1000000000)
+  )
+
+
+full_join(LibraryInfo, final_stats, by='Sample') %>% 
+  write_tsv("../Tables/CountSummary.txt")
+
+```
+
+- In full 105 sample dataset, 47524 of 66023 ENSEMBL features have at least one read mapping
+- 17070 features with >=1 Counts Per Million in at least as many samples as the min of male/famale were included in the differential expression analysis
+
+
+```{r}
+
+numFeatures <- DESeqfit %>%
+  filter(! is.na(log2FoldChange)) %>%
+  group_by(ageBin) %>%
+  dplyr::summarise(n=n()) %>%
+  filter(ageBin != '12-19' & ageBin != '12_19') %>%
+  mutate(week=ifelse(ageBin=='15-16' | ageBin=='15_16', 15.5,
+                     ifelse(ageBin=='17-19' | ageBin=='17_19', 18, as.numeric(ageBin))
+        ))
+
+feature_stats <- data.frame(Samples=c(ncol(count_matrix)), TotalFeatures=c(nrow(count_matrix)))
+feature_stats <- count_matrix %>%
+  mutate(sum=rowSums(.)) %>%
+  filter(sum > 0) %>%
+  dplyr::summarise(NonZeroFeatures=n()) %>%
+  bind_cols(feature_stats)
+feature_stats <- MalevsFemale_complete %>%
+  filter(! is.na(FC)) %>%
+  dplyr::summarise(IncludedFeatures=n()) %>%
+  bind_cols(feature_stats)
+  
+dplyr::select(feature_stats, Samples, TotalFeatures, NonZeroFeatures, IncludedFeatures)
+
+p1 <- count_matrix %>%
+  gather(Sample, Count) %>%
+  mutate(Sample = as.character(Sample)) %>%
+  filter(Count > 0) %>%
+  group_by(Sample) %>%
+  dplyr::summarise(n=n()) %>%
+  full_join(dplyr::select(LibraryInfo, Sample, PCW, Sex)) %>% 
+  ggplot(aes(x=PCW, y=n)) +
+    geom_bar(aes(x=week, y=n), stat='identity', data=numFeatures) +
+    geom_jitter(aes(colour=Sex), height=0, width=.25) +
+    main_theme() +
+    scale_y_continuous(limits=c(0,66000), breaks=seq(0,60000,10000)) +
+    scale_x_continuous(breaks=seq(12, 19, 1)) +
+    xlab("Post Conception Weeks") +
+    ylab("Ensembl genes (66023 total)") +
+    theme(axis.text.x=element_text(size=8)) +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    theme(legend.position="right")
+p1
+
+```
+# Compare EdgeR to DESeq
+
+- same # of genes in 12-19 PCW analysis when high/low read samples excluded
+- 2 less DE genes in 17-19 week analysis
+- 4 less in 13 PCW analysis
+- 7 more in 12 PCW analysis
+
+- DESeq produces 91 genes using Wald test or 98 using LRT
+- 11638 DE genes when analysing PCW with DESeq LRT
+
+- As we suspected, almost all of the chrX genes that are up in males are in the PAR
+
+```{r}
+ggplot(sigGenes, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+  facet_grid(Method ~ ageBin) +
+    figure_theme() +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Fetal sex') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+#filter(sigGenes, ChrType=='autosome')
+```
+- p-values are generally lower with DESeq then they are with EdgeR
+- A lot of genes that are DE with DESeq were not tested with EdgeR because the counts are low
+- A lot of the genes that are DE with EdgeR were thrown out by DESeq because of high maxCooks scores
+
+```{r}
+
+DESeqCooks <- read_tsv("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt", col_names=TRUE, col_types = cols_only(Id='c', maxCooks='n')) %>%
+  mutate(ageBin='12-19')
+
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  DESeqCooks <- read_tsv(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq/tables/MalevsFemale.complete.txt"), col_names=TRUE, col_types = cols_only(Id='c', maxCooks='n')) %>%
+  mutate(ageBin=ifelse(ageBin=='15_17', '15-16', ifelse(ageBin=='17_20', '17-19', ageBin))) %>% 
+    bind_rows(DESeqCooks)
+}
+
+DESeqCooks <- DESeqCooks %>%  mutate(Id = sub("\\.[0-9]+", "", Id), analysis=paste0(Id, ageBin))
+DESeq_vs_EdgeR <- group_by(sigGenes, analysis) %>%
+  summarise(n=n()) %>%
+  left_join(DESeqfit, by='analysis') %>% 
+  dplyr::select(analysis, DESeq_pvalue=pvalue, DESeq_padj=padj, ageBin, baseMean) %>%
+  left_join(dplyr::select(EdgeRfit, analysis, EdgeR_pvalue=pvalue, EdgeR_padj=padj), by='analysis') %>%
+  left_join(dplyr::select(DESeqCooks, analysis, maxCooks), by='analysis')
+
+mutate(DESeq_vs_EdgeR, EdgeR_filtering=ifelse(is.na(EdgeR_padj), 'not tested', 'tested')) %>%
+  group_by(EdgeR_filtering) %>% 
+  summarise(n=n(), mean_Expression=mean(baseMean))
+
+mutate(DESeq_vs_EdgeR, DESeq_filtering=ifelse(is.na(DESeq_padj), 'not tested', 'tested')) %>%
+  group_by(DESeq_filtering) %>% 
+  summarise(n=n(), mean_maxCooks=mean(maxCooks))
+
+ggplot(DESeq_vs_EdgeR, aes(x=DESeq_pvalue, y=EdgeR_pvalue, colour=ageBin)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    figure_theme() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(DESeq_vs_EdgeR, aes(x=DESeq_padj, y=EdgeR_padj, colour=ageBin)) + geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('FDR corrected p-values') +
+    theme(legend.position = 'right')
+
+```
+
+# Add Surrogate Variable Analysis
+
+``` {r sva}
+DESeqfitSVA <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq_sva3/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+
+DESeqfitSVA_sig <- filter(DESeqfitSVA, padj<.1)
+
+DESeq_vs_DESeqSVA <- filter(sigGenesDESeq, ageBin=='12-19') %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>%
+  full_join(dplyr::select(DESeqfitSVA_sig, Id, SYMBOL, Chr, gene_type), by = c("Id", "SYMBOL", "Chr", "gene_type")) %>%
+  left_join(dplyr::select(filter(DESeqfit, ageBin=='12-19'), Id, Sex, ChrType, DESeq_pvalue = pvalue, DESeq_padj = padj), by = "Id") %>%
+  left_join(dplyr::select(DESeqfitSVA, Id, DESeqSVA_pvalue=pvalue, DESeqSVA_padj=padj), by = "Id") %>% 
+  mutate(Method=ifelse(!is.na(DESeqSVA_padj) & DESeqSVA_padj < .1,
+                       ifelse(!is.na(DESeq_padj) & DESeq_padj < .1, 
+                              'Both Sig',
+                              'SVA Sig'),
+                       'DESeq Sig'),
+          Tested=ifelse(is.na(DESeqSVA_padj),
+                             'DESeq Tested',
+                             ifelse(is.na(DESeq_padj), 
+                                    'SVA Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        ) %>% 
+  group_by(Id) %>% slice(1) %>% ungroup() 
+
+dplyr::group_by(DESeq_vs_DESeqSVA, Tested, ChrType, Method) %>% summarise(n=n()) %>% spread(Method, n)
+
+ggplot(DESeq_vs_DESeqSVA, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ Method) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+ggplot(filter(DESeq_vs_DESeqSVA, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(DESeqSVA_padj)) , aes(x=DESeq_pvalue, y=DESeqSVA_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    #scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_DESeqSVA, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(DESeqSVA_padj)), aes(x=DESeq_padj, y=DESeqSVA_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    #scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
+    theme(legend.position = 'right')
+
+
+```
+
+# Compare DESeq2 to Sleuth
+- Correspondance of p-values is generally poor
+- all DESeq genes with FDR < 0.001 (3 genes) are also sig by Sleuth
+- of 14 Sleuth genes with FDR < 0.001, only 6 were tested by DESeq and only 3 were significant (including 6 with Sleuth FDR < 1e-7 where one was tested by DESeq and it was not significant)
+
+
+- Both methods agree on Y genes.
+- Sleuth fails to pull out most PAR genes and some other X genes
+- Lists of autosomal genes are mostly orthogonal (3 in common out of 61)
+- Many autosomal genes tested only by Sleuth and some Y genes tested only by DESeq
+
+``` {r Sleuth_vs_DESeq}
+SleuthSig <- (filter(Sleuth, qval<.1 & ! is.na(Id)))
+
+DESeq_vs_Sleuth <- filter(sigGenesDESeq, ageBin=='12-19') %>%
+  dplyr::select(Id, SYMBOL, Chr, ChrType, gene_type) %>%
+  full_join(dplyr::select(SleuthSig, Id, SYMBOL, Chr, ChrType, gene_type)) %>%
+  left_join(dplyr::select(filter(DESeqfit, ageBin=='12-19'), Id, Sex, ChrType, DESeq_pvalue = pvalue, DESeq_padj = padj)) %>%
+  left_join(dplyr::select(Sleuth, Id, Sleuth_pvalue=pval, Sleuth_padj=qval)) %>%
+  mutate(Method=ifelse(!is.na(Sleuth_padj) & Sleuth_padj < .1,
+                       ifelse(!is.na(DESeq_padj) & DESeq_padj < .1, 
+                              'Both Sig',
+                              'Sleuth Sig'),
+                       'DESeq Sig'),
+          Tested=ifelse(is.na(Sleuth_padj),
+                             'DESeq Tested',
+                             ifelse(is.na(DESeq_padj), 
+                                    'Sleuth Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        )
+
+
+ggplot(DESeq_vs_Sleuth, aes(x=Sex, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ Method) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(Sleuth_padj)) , aes(x=DESeq_pvalue, y=Sleuth_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(DESeq_vs_Sleuth, ChrType=='autosomal' & ! is.na(DESeq_padj) & ! is.na(Sleuth_padj)), aes(x=DESeq_padj, y=Sleuth_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
+    theme(legend.position = 'right')
+```
+
+# Gene-level vs. Transcript-level
+- All DE genes should have one or more DE transcripts and DE transcripts should result in gene-level DE unless (A) the DE transcript is expressed at a low level relative to other isoforms or (B) isoform switching results in Male biased transcripts balancing out Female biased transcripts
+- 
+
+
+
+```{r gene_vs_isoform}
+
+TopIsoformSig <- (filter(fittedBias_topIsoform, padj<.1 & ! is.na(Id)))
+SigGenes <- filter(fittedBias, padj<.1)
+# Need to join on Id, SYMBOL, Chr and gene_type because otherwise if these are added from one of the data sets, the values are NA for any genes that weren't tested for that dataset.
+# Unfortunately I've uesed different data sources for assigning SYMBOLs to the gene IDs. This means that some rows are duplicated. The group/slice/ungroup at the end takes care of this
+gene_vs_isoform 
+  
+SigGenes %>%
+  dplyr::select(Id, SYMBOL, Chr, gene_type) %>% View()
+  full_join(dplyr::select(SleuthTopIsoformSig, Id, SYMBOL, Chr, gene_type)) %>% 
+  left_join(dplyr::select(Sleuth, Id, ChrType, gene_pvalue = pval, gene_padj = qval)) %>%
+  left_join(dplyr::select(SleuthTopIsoform, Id, isoform_pvalue=pval, isoform_padj=qval)) %>% 
+  mutate(Method=ifelse(!is.na(gene_padj) & gene_padj < .1,
+                       ifelse(!is.na(isoform_padj) & isoform_padj < .1, 
+                              'Both Sig',
+                              'Gene Sig'),
+                       'Isoform Sig'),
+          Tested=ifelse(is.na(gene_padj),
+                             'Isoform Tested',
+                             ifelse(is.na(isoform_padj), 
+                                    'Isoform Tested', 
+                                    'Both Tested')
+                        ),
+         ChrType=ifelse(is.na(ChrType), 
+                        ifelse(Chr %in% c('chrX', 'chrY'), Chr, 'autosomal'),
+                        ChrType)
+        ) %>% 
+  group_by(Id) %>% dplyr::slice(1) %>% ungroup() 
+
+#filter(gene_vs_isoform_Sleuth, ChrType=='autosomal') 
+ggplot(gene_vs_isoform_Sleuth, aes(x=Method, fill=factor(ChrType, levels=c('autosomal', 'PAR', 'chrX', 'chrY')))) + geom_bar(position='stack') + 
+    figure_theme() +
+    facet_grid(Tested ~ .) +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,6,4,2)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Analysis') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('A.') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(gene_vs_isoform_Sleuth, ! is.na(isoform_padj) & ! is.na(gene_padj)) , aes(x=gene_pvalue, y=isoform_pvalue, colour=Method)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    figure_theme() +
+    #scale_y_log10(limits=c(1e-12, 1)) + scale_x_log10(limits=c(1e-12, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values ') +
+    theme(legend.position = 'right')
+
+
+ggplot(filter(gene_vs_isoform_Sleuth, ! is.na(gene_padj) & ! is.na(isoform_padj)), aes(x=gene_padj, y=isoform_padj, colour=Method)) +
+    geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    geom_hline(yintercept=.1, linetype=3)+
+    geom_vline(xintercept=.1, linetype=3)+
+    #xlab('Sex Chromosomes Included') +
+    #ylab('Sex Chromosomes Excluded') +
+    #scale_y_log10(limits=c(1e-10, 1)) + scale_x_log10(limits=c(1e-10, 1)) +
+    scale_y_log10() + scale_x_log10() +
+    ggtitle('q-values') +
+    theme(legend.position = 'right')
+```
+# plot genes with major differences between gene-level and transcript-level analyses
+
+- SDCBP2-AS1 is highly DE according to the Sleuth isoform analysis and less sig according to the gene-level analysis
+    - This antisense transcript has 4 isoforms that are expressed at a moderately high level in both sexes but one is expressed very highly in some intermediate-age females
+- ANOS1 is highly significant according to isoform analysis and non-significant according to the gene-lvel analysis
+    - this is because there is a DE transcript that is expressed at much lower levels than the main transcript
+- AMY1A is similar, but there's only one isoform
+- DDX3X and ARSD have a lot of isoforms, one of which is DE, but it doesn't look that convincing (FDRs around 1e-4)
+
+- Not that if there are large differences in isoform lengths, count differences will be obscured because I'm plotting TPM which is length-normalised. Kallisto also produces estimated counts, which I could plot instead, but there are trade-offs with both approaches.
+
+```{r}
+AllKallisto <- read_delim("../Counts/AllKallisto.txt", 
+                          "\t", escape_double = FALSE, trim_ws = TRUE) %>%
+  mutate(target_id=str_replace(target_id, '\\.[0-9]+', ''))
+
+PlotTranscripts <- function(geneID, AllKallisto, Sleuth){
+    geneID = sub("(ENSG[0-9]+)\\.[0-9]+", '\\1', geneID)
+    counts <- filter(Sleuth, Id == geneID | SYMBOL == geneID) %>% 
+      dplyr::select(target_id, pval, qval) %>%
+      left_join(AllKallisto) %>% 
+      gather(Sample, TPM, -target_id, -pval, -qval) %>% 
+      left_join(LibraryInfo) %>% 
+      mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
+             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+
+    p <- ggplot(counts, aes(x=Sex, y=TPM, colour=Sex)) +
+      geom_jitter(height = 0, width=.25, alpha=.75) + 
+      facet_wrap(~ target_id, ncol=6) +
+      xlab('') +
+      main_theme() +
+      theme(legend.position='bottom') +
+      scale_colour_brewer(type = "qual", palette = 6) +
+      ggtitle(geneID)
+   p
+}
+PlotTranscriptByAge <- function(transcriptID, AllKallisto, Sleuth){
+    transcriptID = sub("(ENST[0-9]+)\\.[0-9]+", '\\1', transcriptID)
+    counts <- filter(Sleuth, target_id == transcriptID) %>% 
+      dplyr::select(target_id, pval, qval) %>%
+      left_join(AllKallisto) %>% 
+      gather(Sample, TPM, -target_id, -pval, -qval) %>% 
+      left_join(LibraryInfo) %>% 
+      mutate(target_id=paste0(target_id, '\nFDR=', signif(qval, digits = 3)),
+             Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
+
+    p <- ggplot(counts, aes(x=PCW, y=TPM, colour=Sex)) +
+      geom_jitter(height = 0, width=.25, alpha=.75) + 
+      facet_wrap(~ target_id, ncol=10) +
+      xlab('') +
+      main_theme() +
+      theme(legend.position='bottom') +
+      scale_colour_brewer(type = "qual", palette = 6) +
+      ggtitle(transcriptID)
+   p
+}
+
+PlotTranscripts('SDCBP2-AS1', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000609745', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('ANOS1', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000481896', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('AMY1A', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('DDX3X', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000629496', AllKallisto, SleuthIsoform)
+
+PlotTranscripts('ARSD', AllKallisto, SleuthIsoform)
+PlotTranscriptByAge('ENST00000381154', AllKallisto, SleuthIsoform)
+
+```
+
+
+# Gene Types
+- Most DE genes are protein coding (55% of DE autosomes) or lincRNAs (24% of DE autosomes)
+- Protein coding genes tend to have much more reads than lincRNAs
+- PC genes and lincRNAs make up 54% and 12% of background genes, respectively
+- The Y also has a lot of DE pseudogenes
+
+```{r}
+sigGenes %>% group_by(ChrType, ageBin, gene_type, Method) %>% 
+  dplyr::summarise(n=n()) %>%
+  spread(Method, n) %>%
+#select(sigGenes, gene_type, ChrType) %>% table() %>% as.data.frame()
+
+sigAutosomesNum <- dim(filter(sigGenes, ChrType == 'autosomal'))[1]
+sigGenes %>% filter(ChrType == 'autosomal') %>% 
+  group_by(gene_type) %>% 
+  dplyr::summarise(autosomalDE=n()/sigAutosomesNum) %>% 
+  arrange(desc(autosomalDE))
+
+BG <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(
+  Id = col_character(),
+  SYMBOL = col_character(),
+  Chr = col_character(),
+  baseMean = col_double(),
+  Male = col_integer(),
+  Female = col_integer(),
+  FC = col_double(),
+  log2FoldChange = col_double(),
+  pvalue = col_double(),
+  padj = col_double()
+))
+BG %>% 
+  group_by(gene_type) %>%
+  dplyr::summarise(background=n()/dim(BG)[1]) %>%
+  arrange(desc(background))
+
+ggplot(filter(BG, Chr != 'chrX' & Chr != 'chrY'), aes(x=gene_type, y=baseMean)) +
+  geom_jitter(alpha=.1) + 
+  geom_jitter(alpha=1, colour='red', data=filter(BG, padj < .1 & Chr != 'chrX' & Chr != 'chrY')) +
+  scale_y_log10() + 
+  figure_theme() +
+  theme(axis.text.x=element_text(angle=90, hjust = 1)) +
+  ggtitle("Expression levels of autosomal genes in full daatset (red=FDR<0.1)") +
+  xlab('')
+
+ggplot(sigGenesDESeq, aes(x=Sex, fill=gene_type)) + geom_bar(position='stack') + 
+  facet_grid(ChrType ~ ageBin) +
+    figure_theme() +
+    #scale_y_continuous(breaks=seq(100,1000,100)) +
+    #scale_fill_manual(values=brewer.pal(6, "Set1")[c(1,2,4)]) +
+    theme(strip.switch.pad.grid = unit(10, 'cm')) +
+    ylab('Number sex-biased genes (FDR<0.1)') +
+    xlab('Fetal sex') +
+    theme(axis.title.y=element_text(size=9)) +
+    theme(axis.title.x=element_text(size=9)) +
+    ggtitle('DESeq Genes') +
+    theme(legend.position = 'right')
+```
+
+# Exclude Sex Chromosomes from analysis
+- Nominal p-values are very similar to analysis of all chromosomes
+- FDR correction is much more stringent without sex chromosomes, especially for the 12, 13 and 14 PCW analyses
+```{r}
+AutosomesFit <- read_delim("../Results/Sex_PCW_12_20_FDR_0.1_DESeq_autosomes/tables/BG12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', baseMean='d', 
+Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin='12-19')
+for (ageBin in c('12', '13', '14', '15_17', '17_20') ) {
+  AutosomesFit <- read_delim(paste0("../Results/Sex_", ageBin, "_FDR_0.1_DESeq_autosomes/tables/BG", ageBin, ".txt"), "\t",                      escape_double = FALSE, trim_ws = TRUE, col_types = cols(Id='c', SYMBOL='c', Chr='c', 
+             baseMean='d', Male='i',Female='i',FC='d', log2FoldChange='d', pvalue='d', padj='d')) %>%
+  mutate(ageBin=ageBin) %>% 
+    bind_rows(AutosomesFit)
+}
+AutosomesFit <- AutosomesFit %>%  mutate(Sex = ifelse(log2FoldChange < 0, 'F', 'M'),
+         Method='DESeq_autosomes',
+         analysis=paste0(Id, ageBin)) %>%
+  left_join(dplyr::select(gene_info, Id, ChrType), by='Id')
+sigAutosomes <- AutosomesFit %>% filter(padj < .1 )
+
+
+AutosomeExclusion <- filter(sigGenesDESeq, ChrType=='autosomal') %>%
+  dplyr::select(analysis, XYpvalue=pvalue, XYpadj=padj, ageBin) %>%
+  left_join(dplyr::select(AutosomesFit, analysis, Autosomes_pvalue=pvalue, Autosomes_padj=padj), by='analysis')
+ggplot(AutosomeExclusion, aes(x=XYpvalue, y=Autosomes_pvalue, colour=ageBin)) + 
+    geom_point() +
+    geom_abline(slope=1, intercept=0) +
+    figure_theme() +
+    xlab('Sex Chromosomes Included') +
+    ylab('Sex Chromosomes Excluded') +
+    ggtitle('Nominal p-values') +
+    theme(legend.position = 'right')
+
+
+ggplot(AutosomeExclusion, aes(x=XYpadj, y=Autosomes_padj, colour=ageBin)) + geom_point() +
+    figure_theme() +
+    geom_abline(slope=1, intercept=0) +
+    xlab('Sex Chromosomes Included') +
+    ylab('Sex Chromosomes Excluded') +
+    ggtitle('FDR corrected p-values') +
+    theme(legend.position = 'right')
+```
+
+
+
+
+
+# Genes that are DE in combined analysis
+
+- LINC01597 consistently 2 fold higher in males at all timepoints
+- X chromosome genes consistently slightly lower in males at all timepoints
+```{r}
+
+
+all_DE_by_week <- filter(DESeqfit, padj < 0.1 & ageBin=='12-19') %>% 
+  dplyr::select(Id) %>%
+  left_join(DESeqfit)
+
+PlotFC_by_ChrType(all_DE_by_week, 'All DE')
+all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
+  mutate(ChrType=factor(ChrType, levels=c('autosomal', 'chrX', 'chrY', 'PAR'))) %>%
+  PlotFC_by_ChrType("Non Y/XIST DE")
+```
+
+# Genes that are DE in any analysis
+
+- There are a number of autosomal genes that are expressed in both sexes at week 12, only in females at week 13 and in neither sex at later timepoints
+    - This pattern is not aparant in the DESeq results
+    
+- There are clearly true positives being filtered out by filtering on maxCooks because XIST is only significant at one time point.
+
+```{r}
+all_DE_by_week <- sigGenes %>% 
+  dplyr::select(Id) %>%
+  group_by(Id) %>%
+  summarise(n=n()) %>% #don't actually need this info, but I want one row per Id
+  left_join(DESeqfit)
+
+PlotFC_by_ChrType(all_DE_by_week, 'All DE')
+all_DE_by_week %>% filter(ChrType != 'chrY' & SYMBOL != 'XIST') %>%
+  PlotFC_by_ChrType("Non Y/XIST DE")
+
+
+```
+
+
+```{r}
+PlotTimepoint<-function(geneID, MalevsFemale_complete, fittedBias, target, ages, title) {
+  geneID = str_replace(geneID, '(ENSG\\d+)\\.\\d+', '\\1')
+  ageSplit <- strsplit(ages, '-')[[1]]
+  min <- ageSplit[1]
+  max <- ageSplit[length(ageSplit)]
+  data <- MalevsFemale_complete %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+    dplyr::select(starts_with('norm')) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(target) %>%
+    filter(PCW >= min & PCW <= max)
+  mean <- filter(fittedBias, SYMBOL == geneID | Id == geneID) %>% filter(ageBin==ages)
+  fc <- mean$log2FoldChange[1] %>% format(digits=2)
+  pval <- mean$pvalue[1]
+  qval <- mean$padj[1]
+  mean <- mean %>% dplyr::select(Male, Female) %>%
+    gather('Sex', 'mean')
+  plot<-  ggplot(data, aes(x=Sex, colour=Sex)) + 
+    geom_jitter(aes(y=value, shape=Analysis), height = 0, width=.1, alpha=.75) + 
+    geom_errorbar(aes(ymin=mean, ymax=mean), colour='black', size=1, width=.5, data=mean) +
+    ylab("Normalised counts") +
+    xlab('') +
+    figure_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+     theme(plot.title=element_text(face="italic")) +
+    ggtitle(title) 
+  plot
+}
+
+
+Fig3a <- PlotTimepoint('GABRA1', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'GABRA1')
+Fig3b <- PlotTimepoint('GRIN2A', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'GRIN2A')
+Fig3c <- PlotTimepoint('NES', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'NES')
+Fig3d <- PlotTimepoint('EOMES', MalevsFemale_complete, DESeqfit, LibraryInfo, '14', 'EOMES')
+
+grid.arrange(Fig3a, Fig3b, Fig3c, Fig3d, ncol=2)
+```
+```{r}
+PlotExpression<-function(geneID, MalevsFemale_complete, target) {
+  geneID = str_replace(geneID, '(ENSG\\d+)\\.\\d+', '\\1')
+  data <- MalevsFemale_complete %>% filter(SYMBOL == geneID | Id == geneID) %>%  
+    dplyr::select(starts_with('norm')) %>%
+    gather() %>%
+    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
+    dplyr::select(Sample, value) %>%
+    left_join(target)
+  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
+    geom_jitter(height = 0, width=.1, alpha=.75) + 
+    geom_smooth() +
+    ylab("normalised counts") +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    ggtitle(geneID) +
+    theme(legend.position=c(0.1,.9)) +
+    theme(plot.background=element_blank())
+  plot
+}
+PlotExpression('CRNDE', MalevsFemale_complete, LibraryInfo)
+PlotExpression('GDA', MalevsFemale_complete, LibraryInfo)
+```
+# PCA plot
+
+- there is pretty strong separation of new and old samples along PC1
+
+```{r pca}
+vst <- read_tsv('../Results/Sex_PCW_12_20_FDR_0.1_DESeq_sva3/tables/counts_vst.txt')
+metadata<-read_tsv('../Results/Sex_PCW_12_20_FDR_0.1_DESeq_sva3/tables/col_data.txt', col_types=cols(Sample='c'))
+
+vst$var <- rowVars(as.matrix(dplyr::select(vst, -Id)))
+pca <- arrange(vst, desc(var)) %>% .[1:500,] %>% dplyr::select(-Id, -var) %>% t() %>% prcomp()
+prp <- pca$sdev^2 * 100 / sum(pca$sdev^2)
+prp <- round(prp,2)
+
+pca_df <- fortify(pca)
+pca_df$Sample <- row.names(pca_df)
+pca_df <- left_join(pca_df, metadata)
+
+
+# axes 1 et 2
+PlotPCA <- function(pca_df, prp, colour, shape="Sex") {
+
+  p1 <- ggplot(pca_df, aes_string(x="PC1", y="PC2", colour=colour, shape=shape)) + 
+    geom_point() +
+    stat_ellipse(aes(group = Sex)) +
+    xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
+    ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
+    fte_theme() +
+    theme(aspect.ratio=1) +
+    ggtitle(colour)
+
+
+	# axes 3 et 4
+  p2 <- ggplot(pca_df, aes_string(x="PC4", y="PC3", colour=colour, shape=shape)) + 
+    geom_point() +
+    stat_ellipse(aes(group = Sex)) +
+    xlab(sprintf("PC4 (%0.1f%% explained var.)", prp[4])) +
+    ylab(sprintf("PC3 (%0.1f%% explained var.)", prp[3])) +
+    fte_theme() +
+    theme(aspect.ratio=1)
+  
+  if (is.numeric(pca_df[[colour]])) {
+    grid.arrange(p1+scale_colour_distiller(type="seq", palette=15),
+                 p2+scale_colour_distiller(type="seq", palette=15), 
+                 ncol=2)
+  } else {
+    grid.arrange(p1+scale_colour_brewer(type="qual", palette=6),
+                 p2+scale_colour_brewer(type="qual", palette=6), 
+                 ncol=2)
+  }
+}
+PlotPCA(pca_df, prp, "Sex")
+PlotPCA(pca_df, prp, "ReadLength")
+PlotPCA(pca_df, prp, "RIN")
+PlotPCA(pca_df, prp, "PCW")
+PlotPCA(pca_df, prp, "V1")
+PlotPCA(pca_df, prp, "V2")
+PlotPCA(pca_df, prp, "V3")
+
+```
+
+
+- "Escape genes may be especially important in brain function and this could lead to sex differences (Xu and Disteche 2006). About 10% of X-linked genes but only 3% of auto-somal genes cause intellectual disability when mutated (Ropers 2008; Ropers and Hamel 2005; Zechner et al. 2001). This makes the X chromosome an attractive target for study with regard to brain development and function. This pro-brain characteristic of X-linked genes seems to be especially pronounced among X escape genes. Despite fewer escape genes in mouse than human (Berletch et al. 2010; Lopes et al. 2010; Yang et al. 2010), the majority of the mouse escape genes identified thus far play a role in brain development and are conserved in human where they have been implicated in intellectual disability syndromes (Ropers 2010)." (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3136209/)
+```{r}
+#library("ggbio")
+library(grid)
+#library(png)
+library(biovizBase)
+data(hg19IdeogramCyto)
+
+idio<-plotIdeogram(hg19IdeogramCyto, "chrX", aspect.ratio = 1/20)
+#png("../Figures/chrX.png", bg='transparent')
+#plotIdeogram(hg19IdeogramCyto, "chrX")
+#dev.off()
+img <- readPNG("../Figures/chrX.png")
+g <- rasterGrob(img, interpolate=TRUE)
+
+ChrXgenes<-mutate(all_gene_info, pos=start+(end-start)/2) %>% 
+  right_join(filter(DESeqfit, Chr=='chrX' & ageBin=='12-19')) %>%
+  mutate(sig=ifelse(padj>.1 | is.na(padj), '!DE', 'DE'))
+ggplot(ChrXgenes, aes(x=pos, y=log2FoldChange, colour=ChrType, shape=factor(sig))) +
+  annotation_custom(g, xmin = 0, xmax = 156040895 , ymin = .5,
+  ymax = Inf) +
+  geom_point(alpha=.25) + 
+  geom_point(alpha=1, data=filter(ChrXgenes, sig=='DE')) +
+  geom_text(aes(label=SYMBOL, x=pos+1000000), data=filter(ChrXgenes, sig=='DE'), hjust=0, check_overlap = TRUE) +
+  main_theme() +
+  scale_colour_brewer(type = "qual", palette = 6) +
+  scale_y_continuous(limits=c(-2.5,1.2)) +
+  ylab("<--- Female-biased        Male-biased --->") +
+  xlab("") +
+  ggtitle("Log2 fold Bias along chrX") +
+  theme(legend.position='right') +
+  theme(axis.title.y = element_text(size=10)) +
+  theme(plot.background=element_blank())
+
+```
+- A large number of genes symbols have multiple entries in the Ballaton table
+- Almost all of these are classified as "no call"
+- There are two genes labeled FAM156A that are both S and two genes labeled SPACA5, one of which is Mostly S and the other one of which is "no call"
+- Since the classifications are almost always consistent, I could just remove the duplicates, but since most of them are "no call" which isn't very interesting anyway, I'm just going to filter all of these out for now.
+- XIST is excluded
+
+```{r}
+XCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BallatonXCI.txt",
+"\t", escape_double = FALSE, col_names = c("SYMBOL", "Status"),
+trim_ws = TRUE)
+
+XCI <- group_by(XCI, SYMBOL) %>% dplyr::summarise(n=n()) %>% filter(n==1) %>% left_join(XCI) %>% dplyr::select(-n)
+
+left_join(XCI, fittedBias) %>%
+  mutate(sig=ifelse(padj<.1, 1,0)) %>%
+  filter(SYMBOL != 'XIST') %>%
+  ggplot(aes(x=Status, y=log2FoldChange, colour=factor(sig))) +
+    geom_jitter(height = 0, width=.25, alpha=.25) +
+    main_theme() +
+    scale_colour_brewer(type = "qual", palette = 6) +
+    theme(axis.text.x=element_text(size=9))
+    
+left_join(XCI, fittedBias) %>%
+  mutate(sig=ifelse(padj<.1, 1,0)) %>%
+  filter(is.na(padj) & Status != 'No call')
+
+filter(XCI, Status != 'No call') %>% dim()
+```
+
+# GTEx Analysis
+- supp table 1 summarises previous findings by Cotton et al and Carrel & Willard
+- supp table 3 lists 9 genes that have not previously been reported as escape but which have similar expression patterns as escape genes (see fig 2d in Tukiainen et al)
+- supp table 13 lists a subset of the genes in supp table 1 (563/631), plus 120 additional genes that are listed as "Unknown"
+- supp table 13 has info about ASE and SS expression, and marks 7 genes as NewCall (6 previously reported as inactive and one as unknown)
+- this includes 4/5 variable ASE genes from fig 3g-k (-USP11)
+- it also includes 4/7 variable genes from single-cell analysis in fig4e-k (-FTX/RPL36A/PHF8)
+- FHL1 is shared between methods
+- unclear why the other 4 genes are not considered new calls
+- CHM is in both the list of novel escape genes and the list of novel variable genes for some reason. I guess I'll call it variable
+
+- 583/631 genes in GTEx analysis can be matched to genes in Ballaton et al.
+- 27/27 E and 21/25 mostly E genes classified as escape in GTEx (as are 17/17 PAR genes)
+- 30/31 VE and 7/9 mostly VE genes classified as variable
+- 273/286 S and 90/110 mostly S genes classified as inactive (11 as variable and 2 as escape)
+ 
+```{r}
+XCIsummary <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/XCIsummary.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+group_by(XCIsummary, CombinedXCIstatus) %>% summarise(n=n())
+GTExXCI <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/GTExXCI.txt", "\t", escape_double = FALSE, col_names = TRUE, trim_ws = TRUE)
+
+dplyr::select(XCIsummary, GeneID, contains('XCIstatus')) %>% full_join(GTExXCI) %>% group_by(CombinedXCIstatus, ReportedStatus) %>% summarise(n=n())
+
+filter(GTExXCI, NewCall=='x')
+
+inner_join(XCI, XCIsummary, by=c('SYMBOL'='GeneName')) %>% dim()
+inner_join(XCI, XCIsummary, by=c('SYMBOL'='GeneName')) %>% dplyr::select(Status, CombinedXCIstatus) %>% table()
+```
+# Overlap between DEGs and gene set members
+- all overlapping genes in the gene-level analysis are also present in the transcript-level analysis
+- does not include three genes from X-linked ID set which could not be associated with Ensembl IDs (HPRT, BRND3, DNDP)
+- need to be cautious about interpreting overlap with X-linked ID genes since chrX genes are generally female biased. I guess the appropriate background is all expressed chrX genes?
+```{r enrichment}
+gene_sets <-read_delim("../Data/GeneSets.txt", 
+                       "\t", escape_double = FALSE, 
+                       trim_ws = TRUE)
+colnames(gene_sets) <- c('SYMBOL', 'set', 'reference', 'Id')
+disease2gene <- bind_rows(filter(gene_sets, set %in% c('SandersASD', 'PitonID'))[, c("set", "Id")],
+                          dplyr::select(fittedBias, Id) %>% mutate(set='Background'))
+
+FemaleDEG <- fittedBias %>% filter(padj<0.1 & log2FoldChange < 0) %>% 
+  dplyr::select(Id, SYMBOL) %>%
+  mutate(Direction='FemaleDEG', Analysis="Gene-Level")
+MaleDEG <- fittedBias %>% filter(padj<0.1 & log2FoldChange > 0) %>%
+  dplyr::select(Id, SYMBOL) %>%
+  mutate(Direction='MaleDEG', Analysis="Gene-Level")
+FemaleDEG_tr <- fittedBias_tr %>% filter(padj<0.1 & log2FoldChange < 0) %>% 
+  dplyr::select(Id=GeneId, SYMBOL) %>%
+  group_by(Id) %>%
+  dplyr::slice(1) %>%
+  mutate(Direction='FemaleDEG', Analysis="Transcript-Level")
+MaleDEG_tr <- fittedBias_tr %>% filter(padj<0.1 & log2FoldChange > 0) %>%
+  dplyr::select(Id=GeneId, SYMBOL) %>%
+  group_by(Id) %>%
+  dplyr::slice(1) %>%
+  mutate(Direction='MaleDEG', Analysis="Transcript-Level")
+
+bind_rows(FemaleDEG, MaleDEG, FemaleDEG_tr, MaleDEG_tr) %>%
+  inner_join(dplyr::select(gene_sets, -SYMBOL), by='Id')
+
+
+```

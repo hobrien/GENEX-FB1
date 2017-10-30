@@ -8,70 +8,97 @@
 #
 
 library(shiny)
+library(shinyBS)
 
 # Application title
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
 
-navbarPage("Gene Expression in the Fetal Brain: Sex Biases:",
-            tabPanel("Plot",
+navbarPage("Fetal Brain Sequencing (FBSeq) 1: Sex Differences",
+           tabPanel("Sex Differences",
                      sidebarLayout(
                        sidebarPanel(
-                         textInput("geneID", "Gene symbol or Ensembl ID", value='GRIN2A'),
-                         radioButtons("ages", "Post-Conception Weeks", c('12', '13', '14', '15-16', '17-19', '12-19'), selected = '12-19', inline = FALSE,
+                         radioButtons("Bias", "Bias Direction", c('Male Bias'='MaleUp', 'Female Bias'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
                                       width = NULL),
-                         plotOutput("sampleSizeHist", height=200)
-                       ),
-                       
-                       # Show a plot of the generated distribution
-                       mainPanel(
-                         plotOutput("distPlot")
-                       )
-                     )
-            ),
-            tabPanel("Table",
-                     sidebarLayout(
-                       sidebarPanel(
+                         checkboxGroupInput("ChrType", "Chromosome types", 
+                                            choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
+                                            inline = FALSE, width = NULL),
                          radioButtons("p_type", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,
                                       width = NULL),
                          sliderInput("pvalue", "p-value:", 
                                      min = 0, max = 1, value = 0.1, step= 0.01),
+                         textInput("typedPval", "Type p-value", value=.1),
                          conditionalPanel(
-                           'input.dataset === "12-19 PCW"',
-                           downloadButton('download12_19', 'Download')
-                         ),
+                           condition = 'input.tabs == "Gene-level analysis"',
+                           HTML("<strong>Select row to plot data</strong><br>"),
+                           actionButton("PlotSEXdiffs", "Plot"),
+                           HTML("<br><br><strong>Export Gene Table</strong><br>"),
+                           downloadButton('downloadSEX', 'Download Table')
+                         ),   
                          conditionalPanel(
-                           'input.dataset === "12 PCW"',
-                           downloadButton('download12', 'Download')
-                         ),
-                         conditionalPanel(
-                           'input.dataset === "13 PCW"',
-                           downloadButton('download13', 'Download')
-                         ),
-                         conditionalPanel(
-                           'input.dataset === "14 PCW"',
-                           downloadButton('download14', 'Download')
-                         ),
-                         conditionalPanel(
-                           'input.dataset === "15-16 PCW"',
-                           downloadButton('download15_16', 'Download')
-                         ),
-                         conditionalPanel(
-                           'input.dataset === "17-19 PCW"',
-                           downloadButton('download17_19', 'Download')
-                         )
-                         
+                           condition = 'input.tabs == "Transcript-level analysis"',
+                           HTML("<strong>Select row to plot data</strong><br>"),
+                           actionButton("PlotSEXdiffsTr", "Plot individual transcript"), 
+                           #HTML("Plot individual transcript:"), 
+                           actionButton("PlotSEXdiffsAllTr", "Plot all transcripts from gene"),
+                           #HTML("Plot all transcripts from gene"), 
+                           HTML("<br><br><strong>Export Transcript Table</strong><br>"),
+                           downloadButton('downloadSEX_tr', 'Download Table')
+                         )   
                        ),
                        mainPanel(
                          tabsetPanel(
-                           id = 'dataset',
-                           tabPanel('12-19 PCW', DT::dataTableOutput('mytable1')),
-                           tabPanel('12 PCW', DT::dataTableOutput('mytable2')),
-                           tabPanel('13 PCW', DT::dataTableOutput('mytable3')),
-                           tabPanel('14 PCW', DT::dataTableOutput('mytable4')),
-                           tabPanel('15-16 PCW', DT::dataTableOutput('mytable5')),
-                           tabPanel('17-19 PCW', DT::dataTableOutput('mytable6'))
+                           id = 'tabs',
+                           tabPanel('Gene-level analysis', DT::dataTableOutput('SexDiffTable'),
+                                    bsModal("sexDiffsPlot", "Sex Differences", "PlotSEXdiffs", size = "large",plotOutput("SEXdiffs"))
+                                    ),
+                           tabPanel('Transcript-level analysis', DT::dataTableOutput('SexDiffTrTable'),
+                                    bsModal("sexDiffsTrans", "Sex Differences", "PlotSEXdiffsTr", size = "large",plotOutput("SEXdiffs_trans")),
+                                    bsModal("sexDiffsAllTrans", "Sex Differences", "PlotSEXdiffsAllTr", size = "large",plotOutput("SEXdiffs_all_trans"))
+                           )
+                           
                          )
                        )
                      )
-            )
+            ),
+           tabPanel("Expression Trajectory",
+                    sidebarLayout(
+                      sidebarPanel(
+                        radioButtons("Direction", "Change with time", c('Upregulated'='MaleUp', 'Downregulated'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
+                                     width = NULL),
+                        checkboxGroupInput("ChrTypePCW", "Chromosome types", 
+                                           choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
+                                           inline = FALSE, width = NULL),
+                        radioButtons("p_typePCW", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,
+                                     width = NULL),
+                        sliderInput("pvaluePCW", "p-value:", 
+                                    min = 0, max = 1, value = 0.1, step= 0.01),
+                        textInput("typedPvalPCW", "Type p-value", value=.1),
+                        conditionalPanel(
+                          condition = 'input.tabs2 == "Gene-level analysis"',
+                          HTML("<strong>Select row to plot gene-level data</strong><br>"),
+                          actionButton("PlotPCW", "Plot"),
+                          HTML("<br><br><strong>Export Gene Table</strong><br>"),
+                          downloadButton('downloadPCW', 'Download')
+                        ),
+                        conditionalPanel(
+                          condition = 'input.tabs2 == "Transcript-level analysis"',
+                          HTML("<strong>Select row to plot transcripts</strong><br>"),
+                          actionButton("PlotPCWTr", "Plot"),
+                          HTML("<br><br><strong>Export Transcript Table</strong><br>"),
+                          downloadButton('downloadPCW_tr', 'Download')
+                        )
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          id = 'tabs2',
+                          tabPanel('Gene-level analysis', DT::dataTableOutput('PCWTable'),
+                                    bsModal("timeCoursePlot", "Expression Trajectory", "PlotPCW", size = "large",plotOutput("timeCourseRowNum"))
+                          ),
+                          tabPanel('Transcript-level analysis', DT::dataTableOutput('PCWTableTr'),
+                                  bsModal("timeCoursePlot_tr", "Expression Trajectory", "PlotPCWTr", size = "large",plotOutput("timeCourseRowNum_tr"))
+                          )
+                        )
+                      )
+                    )
+           )           
 )
