@@ -3,6 +3,7 @@ library(stringr)
 library(biomaRt)
 library(yaml)
 
+#setwd("../")
 mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
                          dataset = "hsapiens_gene_ensembl",
                          host = 'ensembl.org')
@@ -88,3 +89,34 @@ write_tsv(counts12_20_tr, "Shiny/GENEX-FB1/Data/counts12_20_tr.txt")
 
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
 
+#Prepare Biosample submission for SRA:
+SampleInfo <- read_tsv("Data/SampleInfo.txt")
+NumSamples <- nrow(SampleInfo)
+Biosamples <- data.frame(sample_name=SampleInfo$Sample, 
+                        sample_title=rep(NA, NumSamples), 
+                        bioproject_accession=rep('PRJNA417945', NumSamples), 
+                        organism=rep("Homo sapians", NumSamples), 
+                        isolate=SampleInfo$Sample, 
+                        age=paste(SampleInfo$PCW, "weeks post-conception"), 
+                        biomaterial_provider=rep('Human Developmental Biology Resource (HDBR), 30 Guilford St, London WC1N 1EH', NumSamples), 
+                        sex=SampleInfo$Sex, 
+                        tissue=rep('Fetal Brain', NumSamples), 
+                        cell_line=rep(NA, NumSamples), 
+                        cell_subtype=rep(NA, NumSamples), 
+                        cell_type=rep(NA, NumSamples), 
+                        culture_collection=rep(NA, NumSamples), 
+                        dev_stage=rep("Fetal", NumSamples), 
+                        disease=rep(NA, NumSamples), 
+                        disease_stage=rep(NA, NumSamples), 
+                        ethnicity=rep(NA, NumSamples), 
+                        health_state=rep(NA, NumSamples), 
+                        karyotype=rep(NA, NumSamples), 
+                        phenotype=rep(NA, NumSamples), 
+                        population=rep(NA, NumSamples), 
+                        race=rep(NA, NumSamples), 
+                        sample_type=rep(NA, NumSamples), 
+                        treatment=rep(NA, NumSamples), 
+                        description=rep(NA, NumSamples)
+)
+
+write_tsv(Biosamples, "Data/Human.1.0.tsv", col_names=FALSE, append=TRUE)
