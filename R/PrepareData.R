@@ -90,12 +90,12 @@ write_tsv(counts12_20_tr, "Shiny/GENEX-FB1/Data/counts12_20_tr.txt")
 file.copy("Data/SampleInfo.txt", "Shiny/GENEX-FB1/Data/SampleInfo.txt", overwrite=TRUE)
 
 #Prepare Biosample submission for SRA:
-SampleInfo <- read_tsv("Data/SampleInfo.txt")
+SampleInfo <- read_tsv("Data/SampleInfo.txt", col_types = cols(Sample='c'))
 NumSamples <- nrow(SampleInfo)
 Biosamples <- data.frame(sample_name=SampleInfo$Sample, 
                         sample_title=rep(NA, NumSamples), 
                         bioproject_accession=rep('PRJNA417945', NumSamples), 
-                        organism=rep("Homo sapians", NumSamples), 
+                        organism=rep("Homo sapiens", NumSamples), 
                         isolate=SampleInfo$Sample, 
                         age=paste(SampleInfo$PCW, "weeks post-conception"), 
                         biomaterial_provider=rep('Human Developmental Biology Resource (HDBR), 30 Guilford St, London WC1N 1EH', NumSamples), 
@@ -120,3 +120,43 @@ Biosamples <- data.frame(sample_name=SampleInfo$Sample,
 )
 
 write_tsv(Biosamples, "Data/Human.1.0.tsv", col_names=FALSE, append=TRUE)
+BioSampleObjects<- read_tsv("Data/BioSampleObjects.txt", col_types = cols(`Sample Name`='c', Isolate='c'))
+
+sequences <- read_delim("Data/sequences.txt",
+"\t", col_names=FALSE, escape_double = FALSE, trim_ws = TRUE)
+
+SRA <- data.frame(bioproject_accession=rep('PRJNA417945', NumSamples),
+                  title=rep('Human fetal brain RNA sequencing', NumSamples),
+                  library_ID=SampleInfo$Sample,
+                  design_description=rep('RNA was extracted from frozen human fetal brain homogenate followed QIAGEN RNeasy MinElute RNA cleanup & ribosomal RNA depletion using Ribo-Zero and Illumina TruSeq Stranded Total RNA library preparation', NumSamples),
+                  library_strategy=rep('RNA-Seq', NumSamples),
+                  library_source=rep('TRANSCRIPTOMIC', NumSamples),
+                  library_selection=rep('RANDOM', NumSamples),
+                  library_layout=rep('PAIRED', NumSamples),
+                  platform=rep('ILLUMINA', NumSamples),
+                  filetype=rep('fastq', NumSamples)
+)
+SRA <- dplyr::select(SampleInfo, library_ID=Sample, instrument_model=Sequencer) %>%
+  mutate(instrument_model=ifelse(str_detect(instrument_model, '2500'), "Illumina HiSeq 2500", "Illumina HiSeq 4000")) %>%
+  full_join(SRA)
+
+SRA <- dplyr::select(BioSampleObjects, library_ID=`Sample Name`, biosample_accession=Accession) %>%
+  full_join(SRA)
+
+
+  
+sequences <- sequences %>% mutate(library_ID=str_replace(X2, '-\\d', '')) %>%
+  select(X1, library_ID) %>%
+  group_by(library_ID) %>%
+  mutate(read=paste0('filename', row_number())) %>% 
+  ungroup() %>% 
+  spread(read, X1) %>%
+  select(library_ID, one_of(paste0('filename', seq(12))))
+
+SRA <- full_join(SRA, sequences)
+
+SRA$assembly<-NA
+
+SRA <- dplyr::select(SRA, biosample_accession, bioproject_accession, title, library_ID, everything())
+
+write_tsv(SRA, "Data/sra_metadata.txt")
