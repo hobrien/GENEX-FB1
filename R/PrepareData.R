@@ -124,11 +124,18 @@ BioSampleObjects<- read_tsv("Data/BioSampleObjects.txt", col_types = cols(`Sampl
 
 sequences <- read_delim("Data/sequences.txt",
 "\t", col_names=FALSE, escape_double = FALSE, trim_ws = TRUE)
+sequences <- sequences %>% mutate(library_ID=str_replace(X2, '-\\d', '')) %>%
+  select(X1, library_ID) %>%
+  group_by(library_ID) %>%
+  mutate(read=paste0('filename', row_number())) %>% 
+  ungroup() %>% 
+  spread(read, X1) %>%
+  select(library_ID, filename=filename1, one_of(paste0('filename', seq(2, 12))))
 
 SRA <- data.frame(bioproject_accession=rep('PRJNA417945', NumSamples),
                   title=rep('Human fetal brain RNA sequencing', NumSamples),
                   library_ID=SampleInfo$Sample,
-                  design_description=rep('RNA was extracted from frozen human fetal brain homogenate followed QIAGEN RNeasy MinElute RNA cleanup & ribosomal RNA depletion using Ribo-Zero and Illumina TruSeq Stranded Total RNA library preparation', NumSamples),
+                  design_description=rep('RNA was extracted from frozen human fetal brain homogenate followed by QIAGEN RNeasy MinElute RNA cleanup & ribosomal RNA depletion using Ribo-Zero and Illumina TruSeq Stranded Total RNA library preparation', NumSamples),
                   library_strategy=rep('RNA-Seq', NumSamples),
                   library_source=rep('TRANSCRIPTOMIC', NumSamples),
                   library_selection=rep('RANDOM', NumSamples),
@@ -143,20 +150,10 @@ SRA <- dplyr::select(SampleInfo, library_ID=Sample, instrument_model=Sequencer) 
 SRA <- dplyr::select(BioSampleObjects, library_ID=`Sample Name`, biosample_accession=Accession) %>%
   full_join(SRA)
 
-
-  
-sequences <- sequences %>% mutate(library_ID=str_replace(X2, '-\\d', '')) %>%
-  select(X1, library_ID) %>%
-  group_by(library_ID) %>%
-  mutate(read=paste0('filename', row_number())) %>% 
-  ungroup() %>% 
-  spread(read, X1) %>%
-  select(library_ID, one_of(paste0('filename', seq(12))))
-
 SRA <- full_join(SRA, sequences)
 
 SRA$assembly<-NA
 
 SRA <- dplyr::select(SRA, biosample_accession, bioproject_accession, title, library_ID, everything())
 
-write_tsv(SRA, "Data/sra_metadata.txt")
+write_tsv(SRA, "Data/sra_metadata.txt", na='')
