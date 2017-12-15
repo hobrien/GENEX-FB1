@@ -1,3 +1,4 @@
+seqfile: "Data/sequences.txt"
 gene_level:
     '17046': ENSG00000167978
     '17068_17160_17486': ENSG00000229807 #5.61043847519958e-121    

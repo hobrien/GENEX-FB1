@@ -1,5 +1,7 @@
+import GetSequences.py
 configfile: "config.yaml"
 
+files=get_sequences(config['seqfile'])
 
 rule all:
     input:
