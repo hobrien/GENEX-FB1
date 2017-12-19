@@ -49,7 +49,7 @@ for (Id in transcripts$Id) {
 }
 transcripts$excluded=excluded_tr
 
-all_duplicated <- group_by(transcripts, excluded) %>% summarise(n=n()) %>% filter(n>1)
+all_duplicated <- count(transcripts, excluded) %>% filter(n>1)
 for (duplicated in all_duplicated$excluded) {
   print(duplicated)
   x1<- filter(transcripts, excluded==duplicated)
