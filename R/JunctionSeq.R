@@ -15,8 +15,8 @@ library(JunctionSeq)
 decoder <- read.table("Data/SampleInfo.txt",
                       header=TRUE,
                       stringsAsFactors=FALSE);
-gff.file <- "JunctionSeq/withNovel.forJunctionSeq.gff.gz"
-countFiles<- paste0("JunctionSeq/",
+gff.file <- "JunctionSeqF1/withNovel.forJunctionSeq.gff.gz"
+countFiles<- paste0("JunctionSeqF1/",
                     decoder$Sample,
                     "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz")
 
@@ -24,7 +24,7 @@ jscs <- runJunctionSeqAnalyses(sample.files = countFiles,
                                sample.names = decoder$Sample,
                                condition=factor(decoder$Sex),
                                flat.gff.file = gff.file,
-                               nCores = 1,
+                               nCores = 5,
                                analysis.type = "junctionsAndExons"
 )
 
