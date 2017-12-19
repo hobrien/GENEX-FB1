@@ -1,9 +1,9 @@
-configfile: "config.yaml"
+include: "config.py"
 
 rule all:
     input:
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts_report.html", 
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts_report.html"
+        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts_report.html"
 
 rule format_bed:
     input:
@@ -24,7 +24,7 @@ rule transcript_seqs:
     params:
         maxvmem = "4G",
     shell:
-        "bedtools getfasta -fi {input.fasta} -bed {input.bed}" -split -name -s "
+        "bedtools getfasta -fi {input.fasta} -bed {input.bed} -split -name -s "
         "| fold -w 60 | perl -pe 's/\([+-]\)//' > {output}"
 
 rule make_index:
@@ -42,15 +42,15 @@ rule make_index:
 rule run_kalliso:
     input:
         index = rules.make_index.output,
-        reads = [readfiles.values()]
+        reads = lambda wildcards: readfiles[wildcards.sample]
     output:
-        "Kallisto/{sample}/abundances.h5",
-        "Kallisto/{sample}/abundances.tsv",
+        "Kallisto/{sample}/abundance.h5",
+        "Kallisto/{sample}/abundance.tsv",
         "Kallisto/{sample}/run_info.json"
     params:
         maxvmem = "4G",
-        prefix = Kallisto/{sample},
-        sample = {sample},
+        prefix = "Kallisto/{sample}",
+        sample = "{sample}",
     log:
         "Logs/kallisto_quant_{sample}.txt"
     shell:
@@ -58,7 +58,7 @@ rule run_kalliso:
 
 rule gene_level:
     input:
-        expand(Kallisto/{sample}/abundance.tsv, sample=)
+        expand("Kallisto/{sample}/abundance.tsv", sample=readfiles.keys())
     output:
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts_report.html"
     params:
@@ -70,12 +70,12 @@ rule gene_level:
         
 rule transcript_level:
     input:
-        expand(Kallisto/{sample}/abundance.tsv, sample=)
+        expand("Kallisto/{sample}/abundance.tsv", sample=readfiles.keys())
     output:
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts_report.html"
     params:
         maxvmem = "20G"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_kallistoCounts.txt"
+        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_excl_kallistoCounts.txt"
     shell:
         "(Rscript R/FvsMedgeR.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --feature transcripts) 2> {log}"
