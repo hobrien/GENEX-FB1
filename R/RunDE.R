@@ -30,7 +30,7 @@ option_list <- list(
               help="factors to be used as batch correction"),
   make_option(c("-t", "--tool"), type="character", default="DESeq", 
               help="Tool used for analysis (EdgeR, DESeq, DESeqLRT)"),
-  make_option(c("-e", "--exclude"), type="character", default='', 
+  make_option(c("-e", "--exclude"), type="character", default='none', 
               help="Samples to exclude (comma separated list, no spaces)", metavar="excluded"),
   make_option(c("-s", "--sex_chromosomes"), action='store_true', type="logical", default=FALSE, 
               help="Exclude sex chromosomes", metavar="sex_chromosomes"),
@@ -96,7 +96,8 @@ projectName <- paste0(varInt,
        'FDR_', alpha,
        '_',
        opt$tool,
-       ifelse(opt$feature == 'genes', '', paste0('_', opt$feature)),
+       '_',
+       opt$feature,
        ifelse(length(exclude > 0),
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
        ifelse(opt$sex_chromosomes, '_autosomes', ''),
@@ -176,7 +177,7 @@ if (!is.null(PCW_cutoff)) {
   LibraryInfo <- filter(LibraryInfo, PCW >= PCW_cutoff[1] & PCW < PCW_cutoff[2])
 }
 
-if (length(exclude) > 0) {
+if (length(exclude) > 0 & exclude[1] != 'none') {
   LibraryInfo <- dplyr::filter(LibraryInfo, !Sample %in% exclude)
 }
 
