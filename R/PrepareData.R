@@ -125,12 +125,12 @@ BioSampleObjects<- read_tsv("Data/BioSampleObjects.txt", col_types = cols(`Sampl
 sequences <- read_delim("Data/sequences.txt",
 "\t", col_names=FALSE, escape_double = FALSE, trim_ws = TRUE)
 sequences <- sequences %>% mutate(library_ID=str_replace(X2, '-\\d', '')) %>%
-  select(X1, library_ID) %>%
+  dplyr::select(X1, library_ID) %>%
   group_by(library_ID) %>%
   mutate(read=paste0('filename', row_number())) %>% 
   ungroup() %>% 
   spread(read, X1) %>%
-  select(library_ID, filename=filename1, one_of(paste0('filename', seq(2, 12))))
+  dplyr::select(library_ID, filename=filename1, one_of(paste0('filename', seq(2, 12))))
 
 SRA <- data.frame(bioproject_accession=rep('PRJNA417945', NumSamples),
                   title=rep('Human fetal brain RNA sequencing', NumSamples),
