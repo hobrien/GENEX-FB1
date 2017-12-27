@@ -2,6 +2,7 @@ from GetSequences import get_sequences
 configfile: "config.yaml"
 
 files=get_sequences(config['seqfile'])
+rep_files=get_sequences(config['rep_seqfile'])
 
 rule all:
     input:
@@ -9,6 +10,7 @@ rule all:
         "Results/BGtranscripts.txt",
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts_report.html",
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts_report.html",
+        expand("Kallisto/{sample}/abundance.tsv", sample=rep_files.keys())
 
 rule format_bed:
     input:
