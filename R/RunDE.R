@@ -41,7 +41,9 @@ option_list <- list(
   make_option(c("--sva"), type="integer", default=0, 
               help="Number of Surrogate Variables to estimate"),
   make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
-              help="Use counts derived from Kallisto")
+              help="Use counts derived from Kallisto"),
+  make_option(c("-o", "--out"), type="character", default=NA, 
+              help="project name/output folder name")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -87,7 +89,8 @@ interact <- strsplit(opt$interact, ',')[[1]]
 exclude <- strsplit(opt$exclude, '_')[[1]]
 batch <- c(strsplit(opt$batch, ',')[[1]], strsplit(opt$cofactor, ',')[[1]])
 
-projectName <- paste0(varInt, 
+if ( is.na(opt$out) ){
+    projectName <- paste0(varInt, 
        ifelse(nchar(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
        ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
        '_', ageBin,
@@ -103,6 +106,10 @@ projectName <- paste0(varInt,
        ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
        ifelse(opt$kallisto, "_kallistoCounts", "")
 )                         # name of the project
+} else {
+  projectName <- opt$out
+}
+
 print(paste("Saving output to", projectName))
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
