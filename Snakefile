@@ -2,7 +2,7 @@ from GetSequences import get_sequences
 configfile: "config.yaml"
 
 files=get_sequences(config['seqfile'])
-rep_files=get_sequences(config['rep_seqfile'])
+#rep_files=get_sequences(config['rep_seqfile'])
 
 rule all:
     input:
@@ -10,7 +10,7 @@ rule all:
         "Results/BGtranscripts.txt",
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts_report.html",
         "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts_report.html",
-        expand("Kallisto/{sample}/abundance.tsv", sample=rep_files.keys())
+        #expand("Kallisto/{sample}/abundance.tsv", sample=rep_files.keys())
 
 rule format_bed:
     input:
@@ -54,39 +54,37 @@ rule run_kalliso:
         "Logs/kallisto_quant_{sample}.txt"
     shell:
         "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
-        
+
 rule gene_level:
     input:
-        sample_info="Data/SampleInfo.txt",
-        counts = expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
+        sample_info="Data/SampleInfo.txt"
     output:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_genes_kallistoCounts_report.html"
+        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html"
     params:
         exclude = "{excluded}",
-        maxvmem = "20G"
+        out_name = "Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_kallistoCounts.txt"
+        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --exclude {params.exclude}) 2> {log}"
+        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --exclude {params.exclude} --out {params.out_name}) 2> {log}"
         
 rule transcript_level:
     input:
-        sample_info="Data/SampleInfo.txt",
-        counts = expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
+        sample_info="Data/SampleInfo.txt"
     output:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_transcripts_kallistoCounts_report.html"
+        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html"
     params:
         exclude = "{excluded}",
-        maxvmem = "20G"
+        out_name = "Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_kallistoCounts.txt"
+        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --feature transcripts --exclude {params.exclude}) 2> {log}"
+        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --feature transcripts --exclude {params.exclude} --out {params.out_name}) 2> {log}"
 
 rule outlier_summary:
     input:
-        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_genes_kallistoCounts_report.html", excluded=config["gene_level"]),
-        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_{excluded}_transcripts_kallistoCounts_report.html", excluded=config["transcript_level"]),
+        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html", excluded=config["gene_level"]),
+        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html", excluded=config["transcript_level"])
     output:
         "Results/BGgenes.txt",
         "Results/BGtranscripts.txt"
