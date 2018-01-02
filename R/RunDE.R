@@ -96,7 +96,7 @@ if ( opt$options$batch == 'none') {
     batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
 }
 
-if ( is.na(opt$out) ){
+if ( is.na(opt$options$out) ){
   projectName <- paste0(varInt, 
                         ifelse(nchar(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
                         ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
@@ -115,7 +115,7 @@ if ( is.na(opt$out) ){
                         ifelse(opt$kallisto, "_kallistoCounts", "")
   )                         # name of the project
 } else {
-  projectName <- opt$out
+  projectName <- opt$options$out
 }
 # name of the project
 print(paste("Saving output to", projectName))
