@@ -209,13 +209,13 @@ if (!is.null(male)) {
   LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
 LibraryInfo <- as.data.frame(LibraryInfo)
-
+LibraryInfo <- LibraryInfo[match(map_chr(files, ~ str_split(., '/')[[1]][2]), LibraryInfo$Sample), ]
 # loading counts
 if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
     files <- opt$args
-    names(files) <- map_chr(files, ~ str_split(., '/')[[1]][2])
+    names(files) <- LibraryInfo$Sample
     if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
     } else if ( opt$options$feature == 'transcripts' ) {
