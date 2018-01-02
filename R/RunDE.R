@@ -44,7 +44,9 @@ option_list <- list (
   make_option(c("--sva"), type="integer", default=0, 
               help="Number of Surrogate Variables to estimate"),
   make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
-              help="Use counts derived from Kallisto")
+              help="Use counts derived from Kallisto"),
+  make_option(c("-o", "--out"), type="character", default=NA, 
+              help="project name/output folder name")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -94,23 +96,28 @@ if ( opt$options$batch == 'none') {
     batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
 }
 
-projectName <- paste0(varInt, 
-       ifelse(nchar(opt$options$cofactor)>0, paste0('_', opt$options$cofactor, collapse = ''), ''),
-       ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
-       '_', ageBin,
-       ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
-       ifelse(!is.null(male), 'Subsample_', ''),
-       'FDR_', alpha,
-       '_',
-       opt$options$tool,
-       '_',
-       opt$options$feature,
-       ifelse(length(exclude > 0),
-              paste(c('_excl', exclude), collapse='_', sep='_'), ''),
-       ifelse(opt$options$sex_chromosomes, '_autosomes', ''),
-       ifelse(opt$options$sva > 0, paste0("_sva", opt$options$sva), ""),
-       ifelse(opt$options$kallisto, "_kallistoCounts", "")
-)                         # name of the project
+if ( is.na(opt$out) ){
+  projectName <- paste0(varInt, 
+                        ifelse(nchar(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
+                        ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
+                        '_', ageBin,
+                        ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
+                        ifelse(!is.null(male), 'Subsample_', ''),
+                        'FDR_', alpha,
+                        '_',
+                        opt$tool,
+                        '_',
+                        opt$feature,
+                        ifelse(length(exclude > 0),
+                               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
+                        ifelse(opt$sex_chromosomes, '_autosomes', ''),
+                        ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
+                        ifelse(opt$kallisto, "_kallistoCounts", "")
+  )                         # name of the project
+} else {
+  projectName <- opt$out
+}
+# name of the project
 print(paste("Saving output to", projectName))
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
@@ -208,7 +215,7 @@ if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
     files <- opt$args
-    names(files) <- str_split(files, '/')[[1]][2]
+    names(files) <- map_chr(files, ~ str_split(., '/')[[1]][2])
     if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
     } else if ( opt$options$feature == 'transcripts' ) {
