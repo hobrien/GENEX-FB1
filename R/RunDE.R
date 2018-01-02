@@ -89,7 +89,7 @@ interact <- strsplit(opt$options$interact, ',')[[1]]
 
 exclude <- strsplit(opt$options$exclude, '_')[[1]]
 if ( opt$options$batch == 'none') {
-  batch <-NULL
+  batch <- strsplit(opt$options$cofactor, ',')[[1]]
 } else{
     batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
 }
@@ -166,7 +166,7 @@ library(RColorBrewer)
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
 ) %>%
-  dplyr::select(Sample, Sex, PCW, RIN, ReadLength, Sequencer)
+  dplyr::select(one_of(Sample, varInt, batch))
   
 if (opt$options$feature == 'genes') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) 
