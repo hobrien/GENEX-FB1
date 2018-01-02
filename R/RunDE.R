@@ -45,36 +45,36 @@ option_list <- list(
 )
 
 opt_parser <- OptionParser(option_list=option_list)
-opt <- parse_args(opt_parser)
-if (is.null(opt$min) | is.null(opt$max)){
+opt <- parse_args(opt_parser, positional_arguments=TRUE)
+if (is.null(opt$options$min) | is.null(opt$options$max)){
   print_help(opt_parser)
   stop("Min and Max ages must be specified", call.=FALSE)
 }
-if (! opt$feature %in% c('genes', 'junctions', 'transcripts')) {
+if (! opt$options$feature %in% c('genes', 'junctions', 'transcripts')) {
   stop("feature type not recognised. Must be one of (genes, junctions, transcripts)")
 }
 
-if ( opt$max-opt$min < 1 ) {
+if ( opt$options$max-opt$options$min < 1 ) {
   print_help(opt_parser)
   stop("Min age must be less than max", call.=FALSE)
 }
 
-if (! opt$tool %in% c('EdgeR', 'DESeq', 'DESeqLRT')){
+if (! opt$options$tool %in% c('EdgeR', 'DESeq', 'DESeqLRT')){
   print_help(opt_parser)
   stop("Tool must be one of EdgeR, DESeq or DESeqLRT", call.=FALSE)
 }
 
-if (! opt$interact == "" & ! opt$tool == 'DESeqLRT') {
+if (! opt$options$interact == "" & ! opt$options$tool == 'DESeqLRT') {
   print_help(opt_parser)
   stop("Interactions can only be tested with LRTs", call.=FALSE)
 }
 
-PCW_cutoff <- c(opt$min, opt$max)
+PCW_cutoff <- c(opt$options$min, opt$options$max)
 RIN_cutoff <- opt$rin
-alpha <- opt$pvalue 
-male <- opt$male
-female <- opt$female
-varInt <- opt$varInt  # factor of interest
+alpha <- opt$options$pvalue 
+male <- opt$options$male
+female <- opt$options$female
+varInt <- opt$options$varInt  # factor of interest
 
 ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1, 
                  paste(PCW_cutoff, 
@@ -82,27 +82,27 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  ),
                  PCW_cutoff[1]
 )
-interact <- strsplit(opt$interact, ',')[[1]]
+interact <- strsplit(opt$options$interact, ',')[[1]]
 
-exclude <- strsplit(opt$exclude, '_')[[1]]
-batch <- c(strsplit(opt$batch, ',')[[1]], strsplit(opt$cofactor, ',')[[1]])
+exclude <- strsplit(opt$options$exclude, '_')[[1]]
+batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
 
 projectName <- paste0(varInt, 
-       ifelse(nchar(opt$cofactor)>0, paste0('_', opt$cofactor, collapse = ''), ''),
+       ifelse(nchar(opt$options$cofactor)>0, paste0('_', opt$options$cofactor, collapse = ''), ''),
        ifelse(length(interact)>0, paste0('_x_', interact, collapse = ''), ''),
        '_', ageBin,
        ifelse(!is.na(RIN_cutoff), paste0('_RIN', RIN_cutoff,'_'), '_'),
        ifelse(!is.null(male), 'Subsample_', ''),
        'FDR_', alpha,
        '_',
-       opt$tool,
+       opt$options$tool,
        '_',
-       opt$feature,
+       opt$options$feature,
        ifelse(length(exclude > 0),
               paste(c('_excl', exclude), collapse='_', sep='_'), ''),
-       ifelse(opt$sex_chromosomes, '_autosomes', ''),
-       ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
-       ifelse(opt$kallisto, "_kallistoCounts", "")
+       ifelse(opt$options$sex_chromosomes, '_autosomes', ''),
+       ifelse(opt$options$sva > 0, paste0("_sva", opt$options$sva), ""),
+       ifelse(opt$options$kallisto, "_kallistoCounts", "")
 )                         # name of the project
 print(paste("Saving output to", projectName))
 
@@ -138,7 +138,7 @@ fitType <- "parametric"                              # mean-variance relationshi
 cooksCutoff <-  FALSE #0.75                          # TRUE/FALSE to perform the outliers detection (default is TRUE)
 independentFiltering <- TRUE                         # TRUE/FALSE to perform independent filtering (default is TRUE)
 # p-value adjustment method: "BH" (default) or "BY"
-if (opt$tool == 'DESeqLRT') {
+if (opt$options$tool == 'DESeqLRT') {
   testMethod <- 'LRT'
 } else{
   testMethod <- 'Wald'
@@ -161,9 +161,9 @@ LibraryInfo <- read_tsv(targetFile,
 ) %>%
   dplyr::select(Sample, Sex, PCW, RIN, ReadLength, Sequencer)
   
-if (opt$feature == 'genes') {
+if (opt$options$feature == 'genes') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) 
-} else if (opt$feature == 'junctions') {
+} else if (opt$options$feature == 'junctions') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.junctions.txt')) 
 }
 
@@ -193,14 +193,14 @@ if (!is.null(male)) {
 LibraryInfo <- as.data.frame(LibraryInfo)
 
 # loading counts
-if (opt$kallisto) {
+if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
     files <- file.path("Kallisto", LibraryInfo$Sample, "abundance.tsv")
     names(files) <- LibraryInfo$Sample
-    if ( opt$feature == 'genes' ) {
+    if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
-    } else if ( opt$feature == 'transcripts' ) {
+    } else if ( opt$options$feature == 'transcripts' ) {
       counts <- tximport(files, type = "kallisto", txOut = TRUE, reader=read_tsv)
     } else {
       stop("Kallisto output cannot be used to analyse junctions")
@@ -208,12 +208,12 @@ if (opt$kallisto) {
 } else {
     counts <- loadCountData(target=LibraryInfo, rawDir=rawDir, featuresToRemove=featuresToRemove)
 }
-if (opt$sex_chromosomes) {
+if (opt$options$sex_chromosomes) {
   excludedFeatures <- read_tsv("Data/genes.txt") %>% 
     filter(seqid == 'chrX' | seqid == 'chrY') %>% 
     dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid)
   
-  if (opt$kallisto) {
+  if (opt$options$kallisto) {
     counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
     counts$length <- counts$length[!rownames(counts$length) %in% excludedFeatures$Id, ]
     counts$abundance <- counts$abundance[!rownames(counts$abundance) %in% excludedFeatures$Id, ]
@@ -223,14 +223,14 @@ if (opt$sex_chromosomes) {
   }
 }
 if (varInt == 'PCW'){
-  if (opt$feature == 'genes') {
+  if (opt$options$feature == 'genes') {
     excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt",
                                    "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
-  } else if (opt$feature == 'transcripts') {
+  } else if (opt$options$feature == 'transcripts') {
     excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts/tables/MalevsFemale.complete.txt",
                                    "\t", escape_double = FALSE, trim_ws = TRUE) %>% filter(is.na(padj))
   }
-  if (opt$kallisto) {
+  if (opt$options$kallisto) {
     counts$counts <- counts$counts[!rownames(counts$counts) %in% excludedFeatures$Id, ]
     counts$length <- counts$length[!rownames(counts$length) %in% excludedFeatures$Id, ]
     counts$abundance <- counts$abundance[!rownames(counts$abundance) %in% excludedFeatures$Id, ]
@@ -246,13 +246,13 @@ dir.create(workDir)
 setwd(workDir)
 
 # description plots
-if (opt$kallisto) {
+if (opt$options$kallisto) {
   majSequences <- descriptionPlots(counts=counts$counts, group=LibraryInfo[,varInt], col=colors)
 } else {
   majSequences <- descriptionPlots(counts=counts, group=LibraryInfo[,varInt], col=colors)
 }
 # edgeR analysis
-if ( opt$tool == 'EdgeR' ) {
+if ( opt$options$tool == 'EdgeR' ) {
     # checking parameters
     checkParameters.edgeR(projectName=projectName,author=author,targetFile=targetFile,
                       rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
@@ -269,7 +269,7 @@ if ( opt$tool == 'EdgeR' ) {
 
     # summary of the analysis (boxplots, dispersions, export table, nDiffTotal, histograms, MA plot)
     summaryResults <- summarizeResults.edgeR(out.edgeR, group=LibraryInfo[,varInt], counts=counts, alpha=alpha, col=colors)
-} else if ( opt$tool == 'DESeq' | opt$tool == 'DESeqLRT') {
+} else if ( opt$options$tool == 'DESeq' | opt$options$tool == 'DESeqLRT') {
 # DEseq analysis
   checkParameters.DESeq2(projectName=projectName,author=author,targetFile=targetFile,
                                               rawDir=rawDir,featuresToRemove=featuresToRemove,varInt=varInt,
@@ -278,7 +278,7 @@ if ( opt$tool == 'EdgeR' ) {
                                               typeTrans=typeTrans,locfunc=locfunc,colors=colors)
 
   if (testMethod=='Wald' ) {
-    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact, num_sva=opt$sva, kallisto=opt$kallisto,
+    out.DESeq2 <- run.DESeq2(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact, num_sva=opt$options$sva, kallisto=opt$options$kallisto,
                            locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod,
                            cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
     if (is.numeric(cooksCutoff)) {
@@ -290,7 +290,7 @@ if ( opt$tool == 'EdgeR' ) {
     }  
   } else if (testMethod=='LRT' ) {
     out.DESeq2 <- run.DESeq2.LRT(counts=counts, target=LibraryInfo, varInt=varInt, batch=batch, interact=interact,
-                               locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod, kallisto=opt$kallisto,
+                               locfunc=locfunc, fitType=fitType, pAdjustMethod=pAdjustMethod, kallisto=opt$options$kallisto,
                                cooksCutoff=cooksCutoff, independentFiltering=independentFiltering, alpha=alpha)
   } else {
     stop("testMethod not recognised")
@@ -301,7 +301,7 @@ if ( opt$tool == 'EdgeR' ) {
   # summary of the analysis (boxplots, dispersions, diag size factors, export table, nDiffTotal, histograms, MA plot)
   summaryResults <- summarizeResults.DESeq2(out.DESeq2, group=LibraryInfo[,varInt], col=colors,
                                           independentFiltering=independentFiltering,
-                                          cooksCutoff=cooksCutoff, kallisto=opt$kallisto, alpha=alpha)
+                                          cooksCutoff=cooksCutoff, kallisto=opt$options$kallisto, alpha=alpha)
 } else {
   stop("Tool should be one of 'EdgeR', 'DESeq'")
 }
@@ -316,10 +316,10 @@ gene_info <- read_tsv("../../Data/genes.txt") %>%
   mutate(gene_id = sub("\\.[0-9]+", "", gene_id)) %>%
   dplyr::select(Id = gene_id, SYMBOL=gene_name, Chr=seqid, gene_type)
 
-if ( opt$feature == 'transcripts' ) {
+if ( opt$options$feature == 'transcripts' ) {
   gene_info <- dplyr::rename(tx2gene, Id = transcript_id) %>% right_join(gene_info, by=c("gene_id" = "Id"))
 }
-if (opt$varInt == 'Sex') {
+if (opt$options$varInt == 'Sex') {
   upfile=paste0("tables/MaleUp", ageBin, ".txt")
   downfile=paste0("tables/FemaleUp", ageBin, ".txt")
   col_names <- c('Id', 'baseMean', 'Male', 'Female', 'FC', 'log2FoldChange', 'pvalue', 'padj', 'maxCooks')
@@ -332,7 +332,7 @@ if (opt$varInt == 'Sex') {
 
 Upregulated <- read.delim(paste('tables', list.files('tables', pattern = ".up.txt$") , sep= '/'), check.names=FALSE)  %>% 
     dplyr::select(one_of(col_names))
-if (opt$feature == 'junctions') {
+if (opt$options$feature == 'junctions') {
   Upregulated <- Upregulated %>% mutate(originalId=Id) %>%
   separate_rows(Id, sep='\\+') %>% 
   mutate(Id= str_replace(Id, '\\..*', ''))
@@ -344,7 +344,7 @@ right_join(gene_info, Upregulated) %>%
   
 Downregulated <- read.delim(paste('tables', list.files('tables', pattern = ".down.txt$") , sep= '/'), check.names=FALSE)  %>% 
     dplyr::select(one_of(col_names))
-if (opt$feature == 'junctions') {
+if (opt$options$feature == 'junctions') {
   Downregulated <- Downregulated %>% mutate(originalId=Id) %>%
     separate_rows(Id, sep='\\+') %>% 
     mutate(Id= str_replace(Id, '\\..*', ''))
@@ -361,7 +361,7 @@ Complete <- read.delim(paste('tables', list.files('tables', pattern = ".complete
 Complete <- Complete %>% filter(! is.na(padj))
 
 Complete <- Complete %>% dplyr::select(one_of(col_names))
-if (opt$feature == 'junctions') {
+if (opt$options$feature == 'junctions') {
   Complete <- Complete %>% mutate(originalId=Id) %>%
     separate_rows(Id, sep='\\+') %>% 
     mutate(Id= str_replace(Id, '\\..*', ''))
@@ -372,7 +372,7 @@ right_join(gene_info, Complete) %>%
   write_tsv(paste0("tables/BG", ageBin, ".txt"))
 
 # generating HTML report
-if ( opt$tool == 'EdgeR' ) {
+if ( opt$options$tool == 'EdgeR' ) {
 writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summaryResults=summaryResults,
                   majSequences=majSequences, workDir=workDir, projectName=paste0("MvsF_", PCW_cutoff, collapse='_'), author=author,
                   targetFile=targetFile, rawDir=rawDir, featuresToRemove=featuresToRemove, varInt=varInt,
