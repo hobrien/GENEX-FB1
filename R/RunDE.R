@@ -9,7 +9,8 @@
 rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
 
-option_list <- list(
+option_list <- list (
+#available: adghjlmnoquwyz
   make_option(c("-v", "--varInt"), type="character", default="Sex", 
               help="Variable of interest (either Sex or PCW)"),
   make_option(c("-m", "--min"), type="integer", default=12, 
@@ -21,6 +22,8 @@ option_list <- list(
   make_option(c("-p", "--pvalue"), type="numeric", default=0.1, 
               help="corrected pvalue cutoff", metavar="pvalue"),
   make_option(c("-c", "--cofactor"), type="character", default="", 
+              help="Cofactors (either Sex or PCW)"),
+  make_option(c("--info"), type="character", default="Data/SampleInfo.txt", 
               help="Cofactors (either Sex or PCW)"),
   make_option(c("--male"), type="integer", default=NULL, 
               help="number of male samples"),
@@ -70,7 +73,7 @@ if (! opt$options$interact == "" & ! opt$options$tool == 'DESeqLRT') {
 }
 
 PCW_cutoff <- c(opt$options$min, opt$options$max)
-RIN_cutoff <- opt$rin
+RIN_cutoff <- opt$options$rin
 alpha <- opt$options$pvalue 
 male <- opt$options$male
 female <- opt$options$female
@@ -112,7 +115,7 @@ workDir <- paste("Results", projectName, sep='/')      # working directory for t
 
 rawDir <- "Counts"                                      # path to the directory containing raw counts files
 
-targetFile <- "Data/SampleInfo.txt"
+targetFile <- opt$options$info
 
 featuresToRemove <- c("alignment_not_unique",        # names of the features to be removed
                       "ambiguous", "no_feature",     # (specific HTSeq-count information and rRNA for example)
