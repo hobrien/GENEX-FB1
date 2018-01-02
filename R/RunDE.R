@@ -207,7 +207,7 @@ LibraryInfo <- as.data.frame(LibraryInfo)
 if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
-    files <- file.path("Kallisto", LibraryInfo$Sample, "abundance.tsv")
+    files <- opt$args
     names(files) <- str_split(files, '/')[[1]][2]
     if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
