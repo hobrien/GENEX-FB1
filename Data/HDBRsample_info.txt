@@ -1,4 +1,4 @@
-BrainBankID	Sex	PCW
+Sample	Sex	PCW
 1046	Female	10.0
 1047	Female	12.0
 1102	Female	12.0
