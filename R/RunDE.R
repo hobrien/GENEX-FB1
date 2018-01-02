@@ -160,6 +160,7 @@ locfunc <- "median"                                  # "median" (default) or "sh
 library(devtools)
 load_all(pkg = "R/SARTools")
 library(tidyverse)
+library(stringr)
 library(RColorBrewer)
 
 # loading target file
@@ -207,7 +208,7 @@ if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
     files <- file.path("Kallisto", LibraryInfo$Sample, "abundance.tsv")
-    names(files) <- LibraryInfo$Sample
+    names(files) <- str_split(files, '/')[[1]][2]
     if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
     } else if ( opt$options$feature == 'transcripts' ) {
