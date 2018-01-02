@@ -4,11 +4,14 @@ configfile: "config.yaml"
 files=get_sequences(config['seqfile'])
 rep_files=get_sequences(config['rep_seqfile'])
 
+# remove samples from replication if also in discovery set
+rep_files = {key: rep_files[key] for key in rep_files in key not in files.keys()}
+
 rule all:
     input:
         "Results/BGgenes.txt",
         "Results/BGtranscripts.txt",
-        expand("Kallisto_rep/{sample}/abundance.tsv", sample=rep_files.keys())
+        "Replication/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts_report.html"
 
 rule format_bed:
     input:
@@ -67,6 +70,19 @@ rule run_kalliso_rep:
         "Logs/kallisto_quant_rep{sample}.txt"
     shell:
         "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
+
+rule gene_level_rep:
+    input:
+        expand("Kallisto_rep/{sample}/abundance.tsv", sample=rep_files.keys())
+    output:
+        "Replication/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts_report.html"
+    params:
+        sample_info="Data/HDBRsample_info.txt",
+        out_name = "Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts"
+    log:
+        "Logs/Rep_Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts"
+    shell:
+        "(Rscript R/RunDE.R --info {params.sample_info} --min 12 --max 20 --cofactor PCW --batch none --tool DESeq --kallisto --out {params.out_name} {input}) 2> {log}"
 
 rule gene_level:
     input:
