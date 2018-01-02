@@ -217,7 +217,7 @@ if (opt$options$kallisto) {
     files <- opt$args
     names(files) <- LibraryInfo$Sample
     if ( opt$options$feature == 'genes' ) {
-      counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv)
+      counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv, ignoreTxVersion = TRUE)
     } else if ( opt$options$feature == 'transcripts' ) {
       counts <- tximport(files, type = "kallisto", txOut = TRUE, reader=read_tsv)
     } else {
