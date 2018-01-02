@@ -166,7 +166,7 @@ library(RColorBrewer)
 LibraryInfo <- read_tsv(targetFile, 
                         col_types = cols(.default = col_character())
 ) %>%
-  dplyr::select(one_of(Sample, varInt, batch))
+  dplyr::select(one_of('Sample', varInt, batch))
   
 if (opt$options$feature == 'genes') {
   LibraryInfo <- mutate(LibraryInfo, Files=paste0(Sample, '.chr.counts.txt')) 
@@ -175,8 +175,11 @@ if (opt$options$feature == 'genes') {
 }
 
 LibraryInfo <- LibraryInfo %>%
-  mutate(PCW=as.numeric(PCW), RIN=as.numeric(RIN)) %>%
+  mutate(PCW=as.numeric(PCW)) %>%
   arrange(Sex)
+if ('RIN' %in% batch) {
+  LibraryInfo <- LibraryInfo %>% mutate(RIN=as.numeric(RIN))
+}
 if (!is.na(RIN_cutoff)) {
   LibraryInfo <- filter(LibraryInfo, RIN >= RIN_cutoff)
 }
