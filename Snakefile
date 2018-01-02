@@ -2,15 +2,13 @@ from GetSequences import get_sequences
 configfile: "config.yaml"
 
 files=get_sequences(config['seqfile'])
-#rep_files=get_sequences(config['rep_seqfile'])
+rep_files=get_sequences(config['rep_seqfile'])
 
 rule all:
     input:
         "Results/BGgenes.txt",
         "Results/BGtranscripts.txt",
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_genes_kallistoCounts_report.html",
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_excl_none_transcripts_kallistoCounts_report.html",
-        #expand("Kallisto/{sample}/abundance.tsv", sample=rep_files.keys())
+        expand("Kallisto_rep/{sample}/abundance.tsv", sample=rep_files.keys())
 
 rule format_bed:
     input:
@@ -55,6 +53,21 @@ rule run_kalliso:
     shell:
         "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
 
+rule run_kalliso_rep:
+    input:
+        index = rules.make_index.output,
+        reads = lambda wildcards: rep_files[wildcards.sample]
+    output:
+        "Kallisto_rep/{sample}/abundance.h5",
+        "Kallisto_rep/{sample}/abundance.tsv",
+        "Kallisto_rep/{sample}/run_info.json"
+    params:
+        prefix = "Kallisto_rep/{sample}"
+    log:
+        "Logs/kallisto_quant_rep{sample}.txt"
+    shell:
+        "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
+
 rule gene_level:
     input:
         sample_info="Data/SampleInfo.txt"
@@ -83,11 +96,16 @@ rule transcript_level:
 
 rule outlier_summary:
     input:
+        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts_report.html",
+        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts_report.html",
         expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html", excluded=config["gene_level"]),
-        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html", excluded=config["transcript_level"])
+        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html", excluded=config["transcript_level"]),
     output:
         "Results/BGgenes.txt",
         "Results/BGtranscripts.txt"
+    params:
+        transcripts = "Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts",
+        genes = "Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts"
     run:
         import yaml
         import pandas as pd
@@ -105,16 +123,19 @@ rule outlier_summary:
                 for excluded in high_cooks['gene_level'].keys():
                     for Id in high_cooks['gene_level'][excluded].split('_'):
                         file = path.join("Results", 
-                                         "Sex_PCW_12_20_FDR_0.1_DESeq_excl_{}_kallistoCounts".format(excluded), 
+                                         "Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{}_kallistoCounts".format(excluded), 
                                          "tables", "BG12_20.txt")
                         p = Popen(["grep", Id, file], stdout=PIPE, stderr=PIPE)
                         result, err = p.communicate()
+                        #print(result)
                         result=result.decode('ascii').strip().split('\t')
-                        updated_genes.loc[len(updated_genes)]=result
+                        try:
+                            updated_genes.loc[len(updated_genes)]=result
+                        except ValueError:
+                            print("Results could not be found for {}".format(excluded))
                 updated_genes=updated_genes.set_index('Id')
-                print(updated_genes)
-                FittedBias = pd.read_csv(path.join("Results",
-                                           "Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts",
+                #print(updated_genes)
+                FittedBias = pd.read_csv(path.join("Results", params['genes'],
                                                    "tables", "BG12_20.txt"), 
                                           sep='\t')
                 FittedBias.set_index('Id', inplace=True)
@@ -128,7 +149,7 @@ rule outlier_summary:
                 for excluded in high_cooks['transcript_level'].keys():
                     for Id in high_cooks['transcript_level'][excluded].split('_'):
                         file = path.join("Results", 
-                                         "Sex_PCW_12_20_FDR_0.1_DESeq_excl_{}_transcripts_kallistoCounts".format(excluded),
+                                         "Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{}_kallistoCounts".format(excluded),
                                          "tables", "BG12_20.txt")
                         p = Popen(["grep", Id, file], stdout=PIPE, stderr=PIPE)
                         result, err = p.communicate()
@@ -137,10 +158,9 @@ rule outlier_summary:
                             updated_transcripts.loc[len(updated_transcripts)]=result
                         except ValueError:
                             print("Results could not be found for {}".format(excluded))
-                print(updated_transcripts)
+                #print(updated_transcripts)
                 updated_transcripts=updated_transcripts.set_index('Id')
-                FittedBias_tr = pd.read_csv(path.join("Results",
-                                                   "Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_kallistoCounts",
+                FittedBias_tr = pd.read_csv(path.join("Results", params['transcripts'],
                                                    "tables", "BG12_20.txt"), 
                                           sep='\t')
                 FittedBias_tr.set_index('Id', inplace=True)
