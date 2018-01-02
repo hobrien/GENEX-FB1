@@ -5,7 +5,7 @@ files=get_sequences(config['seqfile'])
 rep_files=get_sequences(config['rep_seqfile'])
 
 # remove samples from replication if also in discovery set
-rep_files = {key: rep_files[key] for key in rep_files in key not in files.keys()}
+rep_files = {key: rep_files[key] for key in rep_files if key not in files.keys()}
 
 rule all:
     input:
