@@ -24,7 +24,7 @@ option_list <- list (
   make_option(c("-c", "--cofactor"), type="character", default="", 
               help="Cofactors (either Sex or PCW)"),
   make_option(c("--info"), type="character", default="Data/SampleInfo.txt", 
-              help="Cofactors (either Sex or PCW)"),
+              help="Sample Info"),
   make_option(c("--male"), type="integer", default=NULL, 
               help="number of male samples"),
   make_option(c("--female"), type="integer", default=NULL, 
@@ -88,7 +88,11 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
 interact <- strsplit(opt$options$interact, ',')[[1]]
 
 exclude <- strsplit(opt$options$exclude, '_')[[1]]
-batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
+if ( opt$options$batch == 'none') {
+  batch <-NULL
+} else{
+    batch <- c(strsplit(opt$options$batch, ',')[[1]], strsplit(opt$options$cofactor, ',')[[1]])
+}
 
 projectName <- paste0(varInt, 
        ifelse(nchar(opt$options$cofactor)>0, paste0('_', opt$options$cofactor, collapse = ''), ''),
