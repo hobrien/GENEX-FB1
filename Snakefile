@@ -78,7 +78,7 @@ rule gene_level_rep:
         "Replication/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts_report.html"
     params:
         sample_info="Data/HDBRsample_info.txt",
-        out_name = "Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts"
+        out_name = "Replication/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts"
     log:
         "Logs/Rep_Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts"
     shell:

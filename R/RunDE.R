@@ -46,7 +46,7 @@ option_list <- list (
   make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
               help="Use counts derived from Kallisto"),
   make_option(c("-o", "--out"), type="character", default=NA, 
-              help="project name/output folder name")
+              help="project name/directory")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -114,15 +114,16 @@ if ( is.na(opt$options$out) ){
                         ifelse(opt$sva > 0, paste0("_sva", opt$sva), ""),
                         ifelse(opt$kallisto, "_kallistoCounts", "")
   )                         # name of the project
+  workDir <- paste("Results", projectName, sep='/')      # working directory for the R session
 } else {
-  projectName <- opt$options$out
+  workDir <- opt$options$out
+  projectName <- basename(workDir)
 }
 # name of the project
 print(paste("Saving output to", projectName))
 
 author <- "Heath O'Brien"                                # author of the statistical analysis/report
 
-workDir <- paste("Results", projectName, sep='/')      # working directory for the R session
 
 rawDir <- "Counts"                                      # path to the directory containing raw counts files
 
@@ -209,7 +210,7 @@ if (!is.null(male)) {
   LibraryInfo <- bind_rows(MaleSamples, FemaleSamples)
 }
 LibraryInfo <- as.data.frame(LibraryInfo)
-LibraryInfo <- LibraryInfo[match(map_chr(files, ~ str_split(., '/')[[1]][2]), LibraryInfo$Sample), ]
+LibraryInfo <- LibraryInfo[match(map_chr(opt$args, ~ str_split(., '/')[[1]][2]), LibraryInfo$Sample), ]
 # loading counts
 if (opt$options$kallisto) {
     library(tximport)
@@ -240,6 +241,9 @@ if (opt$options$sex_chromosomes) {
     counts <- counts[!rownames(counts) %in% excludedFeatures$Id, ]
   }
 }
+
+# this is a (very fragile) hack that alows me to test the same set of genes for Sex diffs and expression trajectories
+# a FAR better approach would be to generate the list of excluded features outside this script, then pass it in as a argument
 if (varInt == 'PCW'){
   if (opt$options$feature == 'genes') {
     excludedFeatures <- read_delim("Results/Sex_PCW_12_20_FDR_0.1_DESeq_kallistoCounts/tables/MalevsFemale.complete.txt",
