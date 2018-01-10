@@ -1,0 +1,84 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r combined_results, cache=TRUE}
+library(tidyverse)
+BGgenes <- read_tsv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Results/BGgenes.txt", col_types =cols(
+  Id = col_character(),
+  SYMBOL = col_character(),
+  Chr = col_character(),
+  gene_type = col_character(),
+  baseMean = col_double(),
+  Male = col_integer(),
+  Female = col_integer(),
+  FC = col_double(),
+  log2FoldChange = col_double(),
+  pvalue = col_double(),
+  padj = col_double(),
+  maxCooks = col_double()
+))
+
+rep_genes <- read_tsv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Replication/Sex_PCW_12_20_FDR_0.1_DESeq_genes_kallistoCounts/tables/BG12_20.txt", col_types =cols(
+  Id = col_character(),
+  SYMBOL = col_character(),
+  Chr = col_character(),
+  gene_type = col_character(),
+  baseMean = col_double(),
+  Male = col_integer(),
+  Female = col_integer(),
+  FC = col_double(),
+  log2FoldChange = col_double(),
+  pvalue = col_double(),
+  padj = col_double(),
+  maxCooks = col_double()
+))
+
+
+combined <- BGgenes %>% mutate(ChrType=case_when(Chr=='chrX' ~ 'chrX', 
+                                                 Chr=='chrY' ~ 'chrY',
+                                                 TRUE ~ 'autosomes' ),
+         Sig=ifelse(padj<.1, 'sig', 'non-sig')) %>%
+  left_join(select(rep_genes, Id, rep_p=pvalue, rep_l2FC=log2FoldChange)) %>%
+  mutate(sign=ifelse(log2FoldChange*rep_l2FC>0, '+', '-'))
+```
+
+```{r rep_pval_plot, dependson="combined_results"}
+  combined %>% filter(!is.na(ChrType)) %>% 
+  ggplot(aes(rep_p, fill=ChrType))+geom_histogram(breaks=seq(0,1, .05))+
+  facet_grid(Sig ~ ChrType, scales='free')
+``` 
+
+```{r pval_proportions, dependson="combined_results"}
+combined  %>% mutate(RepSig=ifelse(rep_p<.1, 'sig', 'non-sig')) %>% 
+  group_by(ChrType, RepSig, Sig) %>% 
+  summarise(n=n()) %>% 
+  filter(!is.na(RepSig) & !is.na(ChrType)) %>%
+  spread(RepSig, n) %>%
+  mutate(prop_sig=sig/(sig+`non-sig`))
+```
+
+```{r rep_lfc_hist, dependson="combined_results"}
+  combined %>% filter(!is.na(ChrType)) %>% 
+  ggplot(aes(x=log2FoldChange, y=rep_l2FC)) +
+  geom_point() +
+  facet_grid(Sig ~ ChrType, scales='free')
+```
+
+
+
+```{r rep_sign_test, dependson="combined_results"}
+group_by(combined, sign, ChrType, Sig) %>%
+  summarise(n=n()) %>% 
+  filter(!is.na(sign) & !is.na(ChrType)) %>%
+  spread(sign, n) %>%
+  ungroup() %>%
+  mutate(total=ifelse(is.na(`-`), `+`, `+` + `-`),
+         prop_same=`+`/total) %>%
+  select(-`-`, same_sign=`+`) %>%
+  rowwise() %>%
+  mutate(binom=list(binom.test(same_sign, total)), pvalue=binom$"p.value")
+
+```
+
