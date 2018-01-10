@@ -67,7 +67,6 @@ combined  %>% mutate(RepSig=ifelse(rep_p<.1, 'sig', 'non-sig')) %>%
 ```
 
 
-
 ```{r rep_sign_test, dependson="combined_results"}
 group_by(combined, sign, ChrType, Sig) %>%
   summarise(n=n()) %>% 
@@ -77,8 +76,8 @@ group_by(combined, sign, ChrType, Sig) %>%
   mutate(total=ifelse(is.na(`-`), `+`, `+` + `-`),
          prop_same=`+`/total) %>%
   select(-`-`, same_sign=`+`) %>%
-  rowwise() %>%
-  mutate(binom=list(binom.test(same_sign, total)), pvalue=binom$"p.value")
+  mutate(binom=map2(same_sign, total, binom.test), pvalue=map_dbl(binom, 'p.value'))
+
 
 ```
 
