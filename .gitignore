@@ -44,6 +44,7 @@ FastQC/*
 Counts/*
 Mappings/*
 Results/*
+Replication/*
 Kallisto/*
 Kallisto_rep/*
 Figures/*
@@ -72,3 +73,6 @@ DAG.svg
 Data/BioSampleObjects.txt
 Data/sra_metadata.txt
 
+
+# External datasets
+Data/Brainspan/*
