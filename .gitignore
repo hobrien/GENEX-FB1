@@ -47,6 +47,7 @@ FastQC/*
 Counts/*
 Mappings/*
 Results/*
+Replication/*
 Kallisto/*
 Figures/*
 Tables/*
@@ -70,3 +71,6 @@ Shiny/GENEX-FB1/README.md
 # Snakemake DAG output
 DAG.svg
 
+
+# External datasets
+Data/Brainspan/*

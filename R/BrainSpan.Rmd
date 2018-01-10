@@ -1,0 +1,81 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(ggbiplot)
+library(ggdendro)
+source("SARTools/R/FormatGGplot.R")
+columns_metadata <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/columns_metadata.csv", col_types = cols(
+  column_num = col_integer(),
+  donor_id = col_integer(),
+  donor_name = col_character(),
+  age = col_character(),
+  gender = col_character(),
+  structure_id = col_integer(),
+  structure_acronym = col_character(),
+  structure_name = col_character()
+))
+
+columns_metadata <- columns_metadata %>% separate(age, c('age', 'unit')) %>% mutate(age = as.numeric(age)) %>% mutate(column_name=paste0(donor_id, structure_acronym))
+
+rows_metadata <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/rows_metadata.csv", col_types = cols(
+  row_num = col_integer(),
+  gene_id = col_integer(),
+  ensembl_gene_id = col_character(),
+  gene_symbol = col_character(),
+  entrez_id = col_integer()))
+
+expression <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/expression_matrix.csv", col_names = c('row_number', columns_metadata$column_name))
+expression <- expression[,-1]
+```
+
+```{r}
+filtered_expression <- expression[,columns_metadata$unit == 'pcw' & columns_metadata$age>11 & columns_metadata$age<20 & columns_metadata$structure_acronym %in% c('CB', 'STC', 'AMY', 'DFC', 'MFC')]
+
+counts.trans <- t(log2(filtered_expression+0.0001))
+rv = apply(filtered_expression, 1, var, na.rm=TRUE)
+pca = prcomp(counts.trans)
+prp <- pca$sdev^2 * 100 / sum(pca$sdev^2)
+prp <- round(prp[1:3],2)
+
+pca_df <- fortify(pca)
+pca_df$column_name <- row.names(pca_df)
+pca_df <- pca_df %>% left_join(columns_metadata)
+ggplot(pca_df, aes(x=PC1, y=PC2, colour=structure_name, shape=gender)) + 
+      geom_point() +
+      xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
+      ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
+      fte_theme() +
+      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6))
+
+ggplot(pca_df, aes(x=PC4, y=PC3, colour=structure_name, shape=gender)) + 
+      geom_point() +
+      xlab(sprintf("PC4 (%0.1f%% explained var.)", prp[4])) +
+      ylab(sprintf("PC3 (%0.1f%% explained var.)", prp[3])) +
+      fte_theme() +
+      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6))
+
+```
+
+```{r}
+hc <- hclust(dist(counts.trans), method="ward.D")
+ddata <- dendro_data(as.dendrogram(hc), type = "rectangle")
+ddata$labels <- left_join(ddata$labels, columns_metadata, by=c('label' = 'column_name'))
+
+ggplot(segment(ddata)) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
+  geom_text(data = ddata$labels, aes(x = x, y = y, label = label, colour=factor(gender)), angle = 90, hjust = 1) + ylab("Height") + 
+  xlab ("Method: Euclidean distance - Ward criterion") + ggtitle("Cluster dendrogram") + fte_theme() + 
+  scale_colour_brewer(type = 'qual', palette = 6) + expand_limits(y=-1500/nrow(ddata)) + 
+  scale_y_continuous(limits=c(-400,2000)) + 
+  theme(axis.text.x = element_blank()) + 
+  theme(legend.position=c(.9,.9))
+```
+
