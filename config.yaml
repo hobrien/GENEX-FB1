@@ -1,7 +1,7 @@
 bedfile: "/c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.bed"
 refseq: "/c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Sequence/WholeGenomeFasta/genome.fa"
 seqfile: "Data/sequences.txt"
-rep_seqfile: "Data/sequences_rep.txt"
+sample_info: "Data/SampleInfo.txt"
 gene_level:
     '17046': ENSG00000167978
     '17068_17160_17486': ENSG00000229807 #5.61043847519958e-121    
