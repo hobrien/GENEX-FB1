@@ -7,11 +7,17 @@ This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
-```{r}
+```{r setup}
 library(tidyverse)
+library(forcats)
 library(ggbiplot)
 library(ggdendro)
+library(Rtsne)
 source("SARTools/R/FormatGGplot.R")
+```
+
+```{r processed_data, include=FALSE, message=FALSE, cache=TRUE}
+#load data
 columns_metadata <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/columns_metadata.csv", col_types = cols(
   column_num = col_integer(),
   donor_id = col_integer(),
@@ -23,24 +29,54 @@ columns_metadata <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSp
   structure_name = col_character()
 ))
 
-columns_metadata <- columns_metadata %>% separate(age, c('age', 'unit')) %>% mutate(age = as.numeric(age)) %>% mutate(column_name=paste0(donor_id, structure_acronym))
-
 rows_metadata <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/rows_metadata.csv", col_types = cols(
   row_num = col_integer(),
   gene_id = col_integer(),
   ensembl_gene_id = col_character(),
   gene_symbol = col_character(),
-  entrez_id = col_integer()))
+  entrez_id = col_integer()
+))
 
+# ages are coded as '12 pcw' for prenatal and '12 yrs' for post natal. 
+# this separates these into separate columns so 12 year olds aren't lumped in with 12 week old fetuses
+# it also combines donor ids with tissue ids to create a unique identifier for each sample
+columns_metadata <- columns_metadata %>% separate(age, c('age', 'unit')) %>% 
+  mutate(age = as.numeric(age)) %>% 
+  mutate(column_name=paste0(donor_id, structure_acronym))
+
+# this uses the unique identifier created above as column names in the expression file
 expression <- read_csv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/BrainSpan/expression_matrix.csv", col_names = c('row_number', columns_metadata$column_name))
-expression <- expression[,-1]
+
+expression <- expression[,-1] # remove row number column
+
+# filter expression columns and col metadata rows to 12-19 pwc (inclusive)
+# by filtering col metadata in parallel, we can continue to use it to create logial vectors to index expression
+expression <- expression[, columns_metadata$unit == 'pcw' & findInterval(columns_metadata$age, c(12,19), rightmost.closed=T) == 1]
+columns_metadata <- columns_metadata[columns_metadata$unit == 'pcw' & findInterval(columns_metadata$age, c(12,19), rightmost.closed=T) == 1, ]
+
+# combine the various cortex types to reduce the number of labels in plots
+columns_metadata <- columns_metadata %>% mutate(structure_recoded=fct_collapse(factor(structure_name),                                                                       cortex=c("dorsolateral prefrontal cortex", 
+                                              "ventrolateral prefrontal cortex", 
+                                              "primary auditory cortex (core)", 
+                                              "primary visual cortex (striate cortex, area V1/17)",                                      "anterior (rostral) cingulate (medial prefrontal) cortex", 
+                                              "primary motor-sensory cortex (samples)", 
+                                              "primary somatosensory cortex (area S1, areas 3,1,2)", 
+                                              "primary motor cortex (area M1, area 4)", 
+                                              "posterior (caudal) superior temporal cortex (area 22c)", 
+                                              "inferolateral temporal cortex (area TEv, area 20)", 
+                                              "posteroventral (inferior) parietal cortex",
+                                              "orbital frontal cortex"
+                                              )
+                                        )
+      )
+# log transform and transpose expression
+# expression+1 is often used to avoid zero counts, but this is a bad idea for RPKM, where non-zero values are often much less than 1
+# counts can be filtered by tissue with ```filtered.counts <- counts.trans[columns_metadata$structure_acronym %in% c('CB', 'STC', 'DFC', 'AMY'), ]```
+counts.trans <- t(log2(expression+0.0001))
 ```
 
-```{r}
-filtered_expression <- expression[,columns_metadata$unit == 'pcw' & columns_metadata$age>11 & columns_metadata$age<20 & columns_metadata$structure_acronym %in% c('CB', 'STC', 'AMY', 'DFC', 'MFC')]
+```{r pca, dependson="processed_data", cache=TRUE}
 
-counts.trans <- t(log2(filtered_expression+0.0001))
-rv = apply(filtered_expression, 1, var, na.rm=TRUE)
 pca = prcomp(counts.trans)
 prp <- pca$sdev^2 * 100 / sum(pca$sdev^2)
 prp <- round(prp[1:3],2)
@@ -48,27 +84,97 @@ prp <- round(prp[1:3],2)
 pca_df <- fortify(pca)
 pca_df$column_name <- row.names(pca_df)
 pca_df <- pca_df %>% left_join(columns_metadata)
-ggplot(pca_df, aes(x=PC1, y=PC2, colour=structure_name, shape=gender)) + 
+```
+
+```{r pca_plot, dependson="pca"}
+p1<-ggplot(pca_df, aes(x=PC1, y=PC2, colour=structure_recoded)) + 
       geom_point() +
       xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
       ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
       fte_theme() +
-      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6))
+      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6)) +
+      ggtitle("PCA")
 
-ggplot(pca_df, aes(x=PC4, y=PC3, colour=structure_name, shape=gender)) + 
+p2<-ggplot(pca_df, aes(x=PC1, y=PC2, colour=donor_name)) + 
       geom_point() +
-      xlab(sprintf("PC4 (%0.1f%% explained var.)", prp[4])) +
-      ylab(sprintf("PC3 (%0.1f%% explained var.)", prp[3])) +
+      xlab(sprintf("PC1 (%0.1f%% explained var.)", prp[1])) +
+      ylab(sprintf("PC2 (%0.1f%% explained var.)", prp[2])) +
       fte_theme() +
-      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6))
+      theme(aspect.ratio=1) +
+      ggtitle("PCA, coloured by individual")
 
+p1
+ggsave("pca1.png", p1)
+p2
+ggsave("pca2.png", p2)
 ```
 
-```{r}
+```{r tsne, dependson="processed_data", cache=TRUE}
+tsne<-Rtsne::Rtsne(counts.trans, perplexity=10)
+```
+
+```{r tsne_plot, dependson="tsne"}
+p1 <- as.data.frame(tsne$Y) %>%
+  bind_cols(columns_metadata) %>%
+  ggplot(aes(V1, V2, colour=structure_recoded))+geom_point() +
+      fte_theme() +
+      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6)) +
+  ggtitle("t-SNE")
+
+p2 <- as.data.frame(tsne$Y) %>%
+  bind_cols(columns_metadata) %>%
+  ggplot(aes(V1, V2, colour=donor_name))+geom_point() +
+      fte_theme() +
+      theme(aspect.ratio=1) +
+  ggtitle("t-SNE, coloured by individual")
+
+p1
+ggsave("tsne1.png", p1)
+p2
+ggsave("tsne2.png", p2)
+#p1 + p2 + plot_layout(ncol = 1)
+```
+
+```{r hclust, dependson="processed_data", cache=TRUE}
 hc <- hclust(dist(counts.trans), method="ward.D")
 ddata <- dendro_data(as.dendrogram(hc), type = "rectangle")
-ddata$labels <- left_join(ddata$labels, columns_metadata, by=c('label' = 'column_name'))
+ddata$labels <- bind_cols(ddata$labels, columns_metadata)
+```
 
+```{r hclust, dependson="hclust"}
+
+plot_categories <-function(columns_metadata, hc, column) {
+  #column<-enquo(column)
+  columns_metadata <- dplyr::select(columns_metadata, column_name, trait := !!column)
+  columns_metadata <- columns_metadata[hc[["order"]],]
+  columns_metadata$order<-1:nrow(columns_metadata)
+  print(ggplot(columns_metadata, aes(order, 1, fill = factor(trait))) +
+     geom_tile() +
+     annotate("text", x=nrow(columns_metadata)/2, y=1, hjust=0.5, label=column) +
+     scale_y_continuous(expand=c(0,0)) +
+     fte_theme() +
+     theme(axis.title=element_blank(),
+           axis.ticks=element_blank(),
+           axis.text=element_blank(),
+           legend.position="none")) +
+     theme(plot.margin = unit(c(0,0,0,0), "cm"))
+  
+}
+#p1<-ggdendrogram(hc, rotate=FALSE, labels=FALSE)+theme(plot.margin = unit(c(0,.5,0,.5), "cm"))
+p1 <- ggplot(ddata$segments) + geom_segment(aes(x = x, y = y, xend = xend, yend = yend))+fte_theme()+theme(axis.title=element_blank(), axis.text=element_blank()) + theme(plot.margin = unit(c(0,0.1,0,0.1), "cm"))
+row1 <- plot_categories(columns_metadata, hc, 'gender')
+row2 <- plot_categories(columns_metadata, hc, 'donor_id')
+row3 <- plot_categories(columns_metadata, hc, 'structure_recoded')+theme(legend.position = "bottom", legend.text = element_text(size=6))
+
+gp1<-ggplotGrob(p1)
+gp2<-ggplotGrob(row1)
+gp3<-ggplotGrob(row2)
+gp4<-ggplotGrob(row3)
+grid.arrange(gp1, gp2, gp3, gp4, ncol=1,heights=c(1/3, 1/6, 1/6, 1/3))
+
+
+p1+row1+row2+row3+plot_layout(ncol = 1, heights = c(3, 1, 1, 1))
+plot_categories(columns_metadata, hc, structure_recoded)
 ggplot(segment(ddata)) + 
   geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
   geom_text(data = ddata$labels, aes(x = x, y = y, label = label, colour=factor(gender)), angle = 90, hjust = 1) + ylab("Height") + 
@@ -77,5 +183,6 @@ ggplot(segment(ddata)) +
   scale_y_continuous(limits=c(-400,2000)) + 
   theme(axis.text.x = element_blank()) + 
   theme(legend.position=c(.9,.9))
+
 ```
 
