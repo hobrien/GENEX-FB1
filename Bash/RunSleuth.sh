@@ -3,7 +3,7 @@
 #$ -cwd
 #$ -j y
 #$ -S /bin/bash
-#$ -l h_vmem=10G
+#$ -l h_vmem=20G
 #
 
 Rscript R/Sleuth.R
