@@ -6,7 +6,6 @@
 ### (https://github.com/hobrien/SARTools)
 ################################################################################
 
-rm(list=ls())                                        # remove all the objects from the R session
 library("optparse")
 
 option_list <- list (
@@ -173,7 +172,7 @@ library(RColorBrewer)
 
 # loading target file
 LibraryInfo <- read_tsv(targetFile, 
-                        col_types = cols(.default = col_character())
+                        col_types = cols(Sample='c')
 ) %>%
   dplyr::select(one_of('Sample', varInt, batch))
   
