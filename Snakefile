@@ -56,13 +56,13 @@ rule estimate_counts:
     input:
         expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
     output:
-        "UncorrectedResults/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/tables/counts_vst.txt"
+        "UncorrectedResults/uncorrected/tables/counts_vst.txt"
     params:
         sample_info=config['sample_info'],
-        exclude = "{excluded}",
-        out_name = "UncorrectedResults/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts"
+        exclude = "none",
+        out_name = "UncorrectedResults/uncorrected"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts.txt"
+        "Logs/uncorrected_results.txt"
     shell:
         "(Rscript R/RunDE.R --info {params.sample_info} --min 12 --max 20 --cofactor PCW "
         "--tool DESeq --kallisto --exclude {params.exclude} "

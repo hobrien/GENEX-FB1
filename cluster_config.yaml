@@ -7,6 +7,12 @@ gene_level:
 gene_level_rep:
     num_cores: 1
     maxvmem: 20G
+estimate_counts:
+    num_cores: 1
+    maxvmem: 20G
+peer:
+    num_cores: 1
+    maxvmem: 30G
 transcript_level:
     num_cores: 1
     maxvmem: 20G
