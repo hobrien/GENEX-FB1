@@ -1,0 +1,57 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+- This uses a couple of interesting methods that will come in handy elsewhere:
+    - uses system call to tabix to extract count data from bed file
+        - this is wrapped in a function, so it should be fairly easy to reuse elsewhere
+    - uses purrr::map2 and purr::map_dbl to run cor.test and extract coefficients in a mutate statement
+        - it also susbstitutes NA in cases where counts aren't available for a gene
+        - I was able to use purrr::safely to skip errors in the get_counts call, but I had to write a wrapper function around cor.test to deal with inputs from these cases. It would be nice if all of this could be handled in-line in my analysis pipe.
+        
+```{r}
+library(tidyverse)
+library(stringr)
+bed_file="~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/expression.bed.gz"
+gene_positions <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/gene_pos.txt",
+"\t", escape_double = FALSE, trim_ws = TRUE) %>%
+    mutate(pos=paste0(`#Chr`, ':', start, '-', end)) %>% 
+  dplyr::select(ID, pos)
+
+id<-'ENSG00000128191'
+
+get_counts<-function(id, positions=gene_positions, bed=bed_file) {
+  gene_pos <- dplyr::filter(positions, ID==id) %>% `$`('pos')
+  stopifnot(length(gene_pos) == 1)
+  counts <- system(paste("tabix", bed, gene_pos), intern=TRUE) %>%
+    str_subset(id) %>%
+    str_split('\t')
+  stopifnot(length(counts) == 1)
+  as.numeric(counts[[1]][5:length(counts[[1]])])
+}
+
+
+X22q <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/22q.txt",
+"\t", escape_double = FALSE, trim_ws = TRUE)
+ref<-X22q[1,]$`Ensembl ID`
+X22q<-X22q[-1,]
+x <- tibble(`Ensembl ID`=c('ENSG00000183628', 'ENSG00000197421', 'svd'))
+
+my_cor_test <- function(x,y){
+  if (is.null(x) || is.null(y)) {
+    list(p.value=NA, estimate=NA)
+  } else cor.test(x,y)
+}
+
+cor <- X22q %>% mutate(cor_test=map2(ref, `Ensembl ID`, function(x,y) my_cor_test(safely(get_counts)(x)$result, safely(get_counts)(y)$result)),
+                       p=map_dbl(cor_test, 'p.value'), r=map_dbl(cor_test, 'estimate')
+                       ) %>% 
+  dplyr::select(-cor_test)
+
+write_tsv(cor, "~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/22q_cor.txt")
+```
+
+
+
