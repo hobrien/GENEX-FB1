@@ -393,3 +393,40 @@ combat_tsne<-Rtsne::Rtsne(t(combat_res), perplexity=10, check_duplicates = FALSE
       theme(aspect.ratio=1) +
   ggtitle("t-SNE, coloured by individual"))
 ```
+
+```{r peer_data, results='hide', message=FALSE, cache=TRUE}
+#load data
+counts_peer <- read_tsv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Peer/residuals.txt", trim_ws = TRUE)
+peer_qn <- genex_qn <- normalize.quantiles(as.matrix(select(counts_peer, -ID)),copy=TRUE) %>% as.tibble()
+colnames(peer_qn) <- paste0(colnames(select(counts_peer, -ID)), '_peer')
+combined_peer <- mutate(peer_qn, Id=counts_peer$ID) %>% inner_join(combined_qn)
+
+SampleInfo <- read_tsv("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Data/SampleInfo.txt", 
+                       col_types = cols(Sample = col_character()), trim_ws = TRUE)
+
+combined_metadata_peer <- SampleInfo %>% select(-RIN, -ReadLength) %>% mutate(source='GENEXPEER', Sample=paste0(Sample, '_peer')) %>% bind_rows(combined_metadata)
+```
+
+```{r peer_pca, message=FALSE, warning=TRUE, cache=TRUE, dependson="peer_data"}
+
+batch <- combined_metadata_peer$source
+modcombat = model.matrix(~1, data=select(combined_metadata_peer, -structure, -donor))
+peer_combat_res = ComBat(dat=select(combined_peer, -Id), batch=batch, mod=modcombat, par.prior=TRUE, prior.plots=FALSE)
+
+peer_combat_pca <- prcomp(t(peer_combat_res))
+peer_combat_pca_df <- pca_to_df(peer_combat_pca, combined_metadata_peer)
+```
+
+``` {r peer_pca_plot, message=FALSE, warning=TRUE, dependson="peer_pca"}
+(p1<- peer_combat_pca_df %>% mutate(structure=ifelse(is.na(structure), source, as.character(structure))) %>%
+  ggplot(aes(x=PC1, y=PC2, colour=structure)) + 
+      geom_point() +
+      xlab(sprintf("PC1 (%0.1f%% explained var.)", pca_prop(peer_combat_pca, 1))) +
+      ylab(sprintf("PC2 (%0.1f%% explained var.)", pca_prop(peer_combat_pca, 2))) +
+      fte_theme() +
+      theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6)) +
+      scale_colour_manual(values=c(brewer.pal(8, 'Paired')[1:5], 'grey', 'black', brewer.pal(8, 'Paired')[6:8])) +
+      ggtitle("PCA"))
+ggsave2("peer_pca.png")
+```
+
