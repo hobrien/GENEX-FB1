@@ -9,6 +9,7 @@
 # RStudio files
 .Rproj.user/
 *.Rproj
+R/*_cache/*
 
 # produced vignettes
 vignettes/*.html
@@ -53,6 +54,7 @@ Figures/*
 Tables/*
 Documents/*
 Paper/*
+Peer/*
 Shiny/GENEX-FB1/Data
 TempFiles/*
 
