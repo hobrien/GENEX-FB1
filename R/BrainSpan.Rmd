@@ -165,7 +165,7 @@ plot_categories <-function(columns_metadata, hc, column) {
   columns_metadata <- dplyr::select(columns_metadata, column_name, trait := !!column)
   columns_metadata <- columns_metadata[hc[["order"]],]
   columns_metadata$order<-1:nrow(columns_metadata)
-  ggplot(columns_metadata, aes(order, 1, fill = factor(trait))) +
+  ggplot(columns_metadata, aes(order, 1, fill = trait)) +
      geom_tile() +
      annotate("text", x=nrow(columns_metadata)/2, y=1, hjust=0.5, label=column) +
      scale_y_continuous(expand=c(0,0)) +
@@ -331,17 +331,17 @@ grid.arrange(gp1, gp2, gp3, gp4, gp5, ncol=1,heights=c(1/3, 1/9, 1/9, 1/9, 1/3))
 
 batch <- combined_metadata$source
 modcombat = model.matrix(~1, data=select(combined_metadata, -structure, -donor))
-combat_res = ComBat(dat=select(combined_qn, -Id), batch=batch, mod=modcombat, par.prior=TRUE, prior.plots=FALSE)
+qn_res = ComBat(dat=select(combined_qn, -Id), batch=batch, mod=modcombat, par.prior=TRUE, prior.plots=FALSE)
 
-combat_pca <- prcomp(t(combat_res))
-combat_pca_df <- pca_to_df(combat_pca, combined_metadata)
+qn_pca <- prcomp(t(qn_res))
+qn_pca_df <- pca_to_df(qn_pca, combined_metadata)
 ```
 
 ``` {r qn_pca_plot, message=FALSE, warning=TRUE, dependson="qn_pca"}
-(p1<-ggplot(combat_pca_df, aes(x=PC1, y=PC2, colour=structure)) + 
+(p1<-ggplot(qn_pca_df, aes(x=PC1, y=PC2, colour=structure)) + 
       geom_point() +
-      xlab(sprintf("PC1 (%0.1f%% explained var.)", pca_prop(combat_pca, 1))) +
-      ylab(sprintf("PC2 (%0.1f%% explained var.)", pca_prop(combat_pca, 2))) +
+      xlab(sprintf("PC1 (%0.1f%% explained var.)", pca_prop(qn_pca, 1))) +
+      ylab(sprintf("PC2 (%0.1f%% explained var.)", pca_prop(qn_pca, 2))) +
       fte_theme() +
       theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6)) +
       ggtitle("PCA"))
@@ -349,9 +349,9 @@ combat_pca_df <- pca_to_df(combat_pca, combined_metadata)
 ```
 
 ```{r qn_hclust, message=FALSE, cache=TRUE, dependson="processed_data"}
-hc <- hclust(dist(t(combat_res)), method="ward.D")
+hc <- hclust(dist(t(qn_res)), method="ward.D")
 qn_ddata <- dendro_data(as.dendrogram(hc), type = "rectangle")
-qn_ddata$labels <- qn_ddata$labels %>% mutate(Sample=colnames(combat_res)) %>%
+qn_ddata$labels <- qn_ddata$labels %>% mutate(Sample=colnames(qn_res)) %>%
    full_join(combined_metadata)
 ```
 
@@ -361,15 +361,18 @@ qn_ddata$labels <- qn_ddata$labels %>% mutate(Sample=colnames(combat_res)) %>%
 p1 <- ggplot(qn_ddata$segments) + geom_segment(aes(x = x, y = y, xend = xend, yend = yend))+fte_theme()+theme(axis.title=element_blank(), axis.text=element_blank()) + theme(plot.margin = unit(c(0,0.1,0,0.1), "cm"))
 row1 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'source')
 row2 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'Sex')
-row3 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'donor')
-row4 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'structure')+theme(legend.position = "bottom", legend.text = element_text(size=6))
+row3 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'PCW')
+row4 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'donor')
+row5 <- plot_categories(rename(combined_metadata, column_name=Sample), hc, 'structure')+theme(legend.position = "bottom", legend.text = element_text(size=6))
 
 gp1<-ggplotGrob(p1)
 gp2<-ggplotGrob(row1)
 gp3<-ggplotGrob(row2)
 gp4<-ggplotGrob(row3)
 gp5<-ggplotGrob(row4)
-grid.arrange(gp1, gp2, gp3, gp4, gp5, ncol=1,heights=c(1/3, 1/9, 1/9, 1/9, 1/3))
+gp6<-ggplotGrob(row5)
+grid.arrange(gp1, gp2, gp3, gp5, gp6, ncol=1,heights=c(1/3, 1/9, 1/9, 1/9, 3/9))
+
 ```
 
 ```{r qn_tsne, dependson="qn_pca", cache=TRUE}
@@ -377,16 +380,16 @@ combat_tsne<-Rtsne::Rtsne(t(combat_res), perplexity=10, check_duplicates = FALSE
 ```
 
 ```{r qn_tsne_plot, message=FALSE, dependson="qn_tsne"}
-(p1 <- as.data.frame(combat_tsne$Y) %>%
-   mutate(Sample=colnames(combat_res)) %>%
+(p1 <- as.data.frame(qn_tsne$Y) %>%
+   mutate(Sample=colnames(qn_res)) %>%
    full_join(combined_metadata) %>%
   ggplot(aes(V1, V2, colour=structure))+geom_point() +
       fte_theme() +
       theme(aspect.ratio=1, legend.position = 'right', legend.text=element_text(size=6)) +
   ggtitle("t-SNE"))
 
-(p2 <- as.data.frame(combat_tsne$Y) %>%
-   mutate(Sample=colnames(combat_res)) %>%
+(p2 <- as.data.frame(qn_tsne$Y) %>%
+   mutate(Sample=colnames(qn_res)) %>%
    full_join(combined_metadata) %>%
     ggplot(aes(V1, V2, colour=donor))+geom_point() +
       fte_theme() +
