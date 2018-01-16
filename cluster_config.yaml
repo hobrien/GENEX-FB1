@@ -1,6 +1,9 @@
 __default__:
     num_cores: 1
     maxvmem: 4G
+gene_level_peer:
+    num_cores: 1
+    maxvmem: 20G
 gene_level:
     num_cores: 1
     maxvmem: 20G
