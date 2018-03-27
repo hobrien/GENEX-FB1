@@ -163,10 +163,6 @@ shinyServer(function(session, input, output) {
     updateSliderInput(session, "pvalue", value = input$typedPval)
     updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
-  observe({
-    updateSliderInput(session, "pvalue", value = input$typedPval)
-    updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
-  })
 
   ################################## Render plots ################################## 
   output$SEXdiffs<- renderPlot({
