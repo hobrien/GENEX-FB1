@@ -14,7 +14,7 @@ option_list <- list (
               help="Variable of interest (either Sex or PCW)"),
   make_option(c("-m", "--min"), type="integer", default=12, 
               help="minimum age (PCW)", metavar="minimum age"),
-  make_option(c("-x", "--max"), type="integer", default=13, 
+  make_option(c("-x", "--max"), type="integer", default=20, 
               help="maximum age (PCW)", metavar="maximum age"),
   make_option(c("-r", "--rin"), type="numeric", default=NA, 
               help="minimum RIN", metavar="minimum RIN"),
