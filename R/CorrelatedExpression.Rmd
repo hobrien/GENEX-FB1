@@ -15,10 +15,15 @@ output: html_notebook
 library(tidyverse)
 library(stringr)
 bed_file="~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/expression.bed.gz"
+
+
 gene_positions <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/gene_pos.txt",
 "\t", escape_double = FALSE, trim_ws = TRUE) %>%
     mutate(pos=paste0(`#Chr`, ':', start, '-', end)) %>% 
   dplyr::select(ID, pos)
+
+genes <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/genes.txt",
+"\t", escape_double = FALSE, trim_ws = TRUE)
 
 id<-'ENSG00000128191'
 
@@ -37,7 +42,6 @@ X22q <- read_delim("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/22q.txt",
 "\t", escape_double = FALSE, trim_ws = TRUE)
 ref<-X22q[1,]$`Ensembl ID`
 X22q<-X22q[-1,]
-x <- tibble(`Ensembl ID`=c('ENSG00000183628', 'ENSG00000197421', 'svd'))
 
 my_cor_test <- function(x,y){
   if (is.null(x) || is.null(y)) {
@@ -45,13 +49,103 @@ my_cor_test <- function(x,y){
   } else cor.test(x,y)
 }
 
-cor <- X22q %>% mutate(cor_test=map2(ref, `Ensembl ID`, function(x,y) my_cor_test(safely(get_counts)(x)$result, safely(get_counts)(y)$result)),
+cor_results <- vector("list", length(X22q$`Ensembl ID`))
+for (i in seq_along(X22q$`Ensembl ID`)) {
+  ref <- X22q$`Ensembl ID`[i]
+  gene <- X22q$`Gene`[i]
+  print(ref)
+  cor_results[[i]] <- X22q %>% mutate(gene1=gene, gene_id1=ref, cor_test=map2(ref, `Ensembl ID`, function(x,y) my_cor_test(safely(get_counts)(x)$result, safely(get_counts)(y)$result)),
                        p=map_dbl(cor_test, 'p.value'), r=map_dbl(cor_test, 'estimate')
                        ) %>% 
-  dplyr::select(-cor_test)
+  dplyr::select(gene1, gene_id1, gene2=Gene, gene_id2=`Ensembl ID`, r, p) 
+}
+bind_rows(cor_results) %>% write_tsv("~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/22q_cor.txt")
 
-write_tsv(cor, "~/BTSync/FetalRNAseq/Github/GENEX-FB2/Data/22q_cor.txt")
 ```
 
+This should give correlations of each gene with RIN
+
+```{r}
+headers <- system(paste('tabix -H', bed_file), intern=TRUE) %>%
+    str_split('\t') %>% `[[`(1) %>% `[`(-c(1,2,3,4))
+
+
+pg_scores <- tibble(Id=headers,
+               Full=numeric(length(headers)), 
+               `5`=numeric(length(headers)), 
+               `3`=numeric(length(headers)), 
+               `2`=numeric(length(headers)), 
+               `1`=numeric(length(headers)), 
+               `05`=numeric(length(headers)),
+               `01`=numeric(length(headers)),
+               `1e-4`=numeric(length(headers)),
+               `1e-6`=numeric(length(headers)),
+               `5e-8`=numeric(length(headers))
+               )
+for (cutoff in colnames(pg_scores)[-1]) {
+  pgrs_output <- read_table(paste0("~/BTSync/FetalRNAseq/Github/GENEX-FB2/PGRS/Heath_Nick_FExp_SZ_PGC2plusCLOZUK2_PRS_MAF10pc_noMHC.P", cutoff, ".profile"))
+  pg_scores[,cutoff] <- pgrs_output[order(match(pgrs_output$IID, pg_scores$Id)),] %>% 
+    `$`(SCORE) %>% 
+    `[`(1:length(pg_scores$Id))
+}
+
+cut_off_mapping <- tibble(name=c('Full', '5', '3', '2', '1', '05', '01', '1e-4', '1e-6', '5e-8'),
+                 Cutoff=c(1, 0.5, 0.3, 0.2, 0.1, 0.05, 0.01, 1e-4, 1e-6, 5e-8))
+
+gather(pg_scores, name, PRS, -Id) %>%
+  left_join(cut_off_mapping) %>% 
+  ggplot(aes(x=log10(Cutoff), y=PRS, group=Id)) + geom_line() + scale_x_reverse()
+```
+
+```{r}
+# this version works directly with positions, rather than extracting the position from gene_positions. 
+# this is convienient when using gene_positions to get correlations for all genes
+get_counts<-function(gene_pos, bed=bed_file) {
+  stopifnot(length(gene_pos) == 1)
+  counts <- system(paste("tabix", bed, gene_pos), intern=TRUE) %>%
+    str_split('\t')
+  stopifnot(length(counts) == 1)
+  as.numeric(counts[[1]][5:length(counts[[1]])])
+}
+
+cutoff <- '05'
+
+PGR05cor <- gene_positions %>% mutate(cor_test=map(pos, function(x) my_cor_test(safely(get_counts)(x)$result, pg_scores[,cutoff][[1]])),
+                       p=map_dbl(cor_test, 'p.value'), r=map_dbl(cor_test, 'estimate'),
+                       fdr=p.adjust(p, method='BH'),
+                       p.adj=p.adjust(p, method='Bonforoni')
+                       ) %>% 
+  dplyr::select(-cor_test) %>%
+  filter(!is.na(r))
+
+PGR05cor <- right_join(genes, PGR05cor, by=c('gene_id' = 'ID')) %>% arrange(p.adj)
+
+mutate(PGR05cor, sig_cor=ifelse(p.adj > 0.05, 'ns', ifelse(r>0, '+', '-'))) %>%
+  group_by(gene_type, sig_cor) %>% summarise(n=n()) %>% spread(sig_cor, n) %>% 
+  filter(!is.na(`-`) | !is.na(`+`)) %>% mutate(`% -` = `-`/ns*100, `% +` = `+`/ns*100)
+```
+
+```{r}
+ENSG00000233913cor <- tibble()
+for (cutoff in colnames(pg_scores)[-1]) {
+  ENSG00000233913cor <- filter(gene_positions, ID=='ENSG00000233913') %>% 
+    mutate(cor_test=map(pos, function(x) my_cor_test(safely(get_counts)(x)$result, pg_scores[,cutoff][[1]])),
+           p=map_dbl(cor_test, 'p.value'), r=map_dbl(cor_test, 'estimate'),
+           name=cutoff) %>% 
+    dplyr::select(-cor_test) %>%
+    bind_rows(PGRcor)
+}
+
+bonferroni <- .05/nrow(gene_positions)
+ENSG00000233913cor %>%
+  left_join(cut_off_mapping) %>%
+  ggplot(aes(x=log10(Cutoff), y=-log10(p)))+geom_line()+geom_point()+scale_x_reverse()+ggtitle('ENSG00000233913')+geom_hline(yintercept=-log10(bonferroni), linetype=3)
+```
+
+```{r}
+for (cutoff in colnames(pg_scores)[-1]) {
+  print(tibble(ENSG00000233913=get_counts(filter(gene_positions, ID=='ENSG00000233913')$pos), PRS=pg_scores[,cutoff][[1]]) %>% ggplot(aes(ENSG00000233913, PRS))+geom_point()+ggtitle(cutoff))
+}
+```
 
 
