@@ -5,11 +5,8 @@ files=get_sequences(config['seqfile'])
 
 rule all:
     input:
-        "Results/BGgenes.txt",
-        "Results/BGtranscripts.txt",
-        "Peer/factors.txt",
-        "Data/SampleInfoPeer.txt",
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts_peer/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts_peer_report.html"
+        "Results/BGgenes_PEER.txt",
+        "Results/BGtranscripts_PEER.txt"
 
 rule format_bed:
     input:
@@ -97,66 +94,65 @@ rule join_factors:
     shell:
         "Rscript R/CombineFactors.R {input.factors} {input.sample_info} {output}"
 
-rule gene_level_peer:
+rule format_cov:
     input:
-        expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
+        config['sample_info']
     output:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_peer/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_peer_report.html"
-    params:
-        sample_info=rules.join_factors.output,
-        exclude = "{excluded}",
-        out_name = "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_peer"
-    log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_peer.txt"
-    shell:
-        "(Rscript R/RunDE.R --info {params.sample_info} --min 12 --max 20 --cofactor PCW "
-        "--tool DESeq --kallisto --exclude {params.exclude} --batch RIN,ReadLength,V5,V6,V7,V8,V9,V10 "
-        "--out {params.out_name} {input}) 2> {log}"
+        "Data/covariates.txt"
+    run:
+        import pandas as pd
+        cov=pd.read_csv(input[0], sep='\t')
+        cov['V1'] = 'sex' + cov['V1'].astype(str) # change sex to string (categorical)
+        cov['V4'] = 'batch' + cov['V4'].astype(str) # change batch to string (categorical)
+        cov.columns = ['Sample', 'Sex', 'PCW', 'RIN', 'ReadLength', 'PC1', 'PC2', 'PC3'] + ['PEER' + str(i) for i in range(1, 11)]
+        cov.to_csv(output[0], sep='\t', header=True)
 
 rule gene_level:
     input:
-        expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
+        counts = expand("Kallisto/{sample}/abundance.tsv", sample=files.keys()),
+        sample_info = rules.format_cov.output
     output:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html"
+        "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html"
     params:
-        sample_info=config['sample_info'],
         exclude = "{excluded}",
-        out_name = "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts"
+        batch = ['RIN', 'ReadLength', 'PC1', 'PC2', 'PC3'] + ['PEER' + str(i) for i in range(1, 11)],
+        out_name = "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts.txt"
+        "Logs/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(Rscript R/RunDE.R --info {params.sample_info} --min 12 --max 20 --cofactor PCW "
-        "--tool DESeq --kallisto --exclude {params.exclude} "
-        "--out {params.out_name} {input}) 2> {log}"
+        "(Rscript R/RunDE.R --info {input.sample_info} --min 12 --max 20 --cofactor PCW "
+        "--batch {params.batch} --tool DESeq --kallisto --exclude {params.exclude} "
+        "--out {params.out_name} {input.counts}) 2> {log}"
         
 rule transcript_level:
     input:
-        expand("Kallisto/{sample}/abundance.tsv", sample=files.keys())
+        counts = expand("Kallisto/{sample}/abundance.tsv", sample=files.keys()),
+        sample_info = rules.format_cov.output
     output:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html"
+        "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html"
     params:
-        sample_info=config['sample_info'],
         exclude = "{excluded}",
-        out_name = "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts"
+        batch = ['RIN', 'ReadLength', 'PC1', 'PC2', 'PC3'] + ['PEER' + str(i) for i in range(1, 11)],
+        out_name = "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts"
     log:
-        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts.txt"
+        "Logs/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(Rscript R/RunDE.R --info {params.sample_info} --min 12 --max 20 --cofactor PCW "
-        "--tool DESeq --kallisto --feature transcripts --exclude {params.exclude} "
-        "--out {params.out_name} {input}) 2> {log}"
+        "(Rscript R/RunDE.R --info {input.sample_info} --min 12 --max 20 --cofactor PCW "
+        "--batch {params.batch} --tool DESeq --kallisto --exclude {params.exclude} "
+        "--feature transcripts --out {params.out_name} {input.counts}) 2> {log}"
 
 rule outlier_summary:
     input:
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts_report.html",
-        "Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts_report.html",
-        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html", excluded=config["gene_level"]),
-        expand("Results/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html", excluded=config["transcript_level"]),
+        "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts_report.html",
+        "Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts_report.html",
+        expand("Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts_report.html", excluded=config["gene_level"]),
+        expand("Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts_report.html", excluded=config["transcript_level"]),
     output:
-        "Results/BGgenes.txt",
-        "Results/BGtranscripts.txt"
+        "Results/BGgenes_PEER.txt",
+        "Results/BGtranscripts_PEER.txt"
     params:
-        transcripts = "Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts",
-        genes = "Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts"
+        transcripts = "Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts",
+        genes = "Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts"
     run:
         import yaml
         import pandas as pd
