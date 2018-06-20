@@ -13,7 +13,7 @@ library(shinyBS)
 # Application title
 #titlePanel("Gene Expression in the Fetal Brain: Sex Biases"),
 
-navbarPage("Fetal Brain Sequencing (FBSeq) 1: Sex Differences",
+navbarPage("Fetal Brain Sequencing (FBSeq) 1: ",
            tabPanel("Sex Differences",
                      sidebarLayout(
                        sidebarPanel(
@@ -61,46 +61,6 @@ navbarPage("Fetal Brain Sequencing (FBSeq) 1: Sex Differences",
                          )
                        )
                      )
-            ),
-           tabPanel("Expression Trajectory",
-                    sidebarLayout(
-                      sidebarPanel(
-                        radioButtons("Direction", "Change with time", c('Upregulated'='MaleUp', 'Downregulated'='FemaleUp', 'Both'), selected = 'Both', inline = FALSE,
-                                     width = NULL),
-                        checkboxGroupInput("ChrTypePCW", "Chromosome types", 
-                                           choices = c('Autosomes'='autosomal', 'ChrX'='chrX', 'ChrY'='chrY'), selected = c('autosomal', 'chrX', 'chrY'),
-                                           inline = FALSE, width = NULL),
-                        radioButtons("p_typePCW", "Maximum p-value", c('Uncorrected p-values' = 'pvalue', 'FDR corrected p-values (q-values)'= 'padj'), selected = 'padj', inline = FALSE,
-                                     width = NULL),
-                        sliderInput("pvaluePCW", "p-value:", 
-                                    min = 0, max = 1, value = 0.1, step= 0.01),
-                        textInput("typedPvalPCW", "Type p-value", value=.1),
-                        conditionalPanel(
-                          condition = 'input.tabs2 == "Gene-level analysis"',
-                          HTML("<strong>Select row to plot gene-level data</strong><br>"),
-                          actionButton("PlotPCW", "Plot"),
-                          HTML("<br><br><strong>Export Gene Table</strong><br>"),
-                          downloadButton('downloadPCW', 'Download')
-                        ),
-                        conditionalPanel(
-                          condition = 'input.tabs2 == "Transcript-level analysis"',
-                          HTML("<strong>Select row to plot transcripts</strong><br>"),
-                          actionButton("PlotPCWTr", "Plot"),
-                          HTML("<br><br><strong>Export Transcript Table</strong><br>"),
-                          downloadButton('downloadPCW_tr', 'Download')
-                        )
-                      ),
-                      mainPanel(
-                        tabsetPanel(
-                          id = 'tabs2',
-                          tabPanel('Gene-level analysis', DT::dataTableOutput('PCWTable'),
-                                    bsModal("timeCoursePlot", "Expression Trajectory", "PlotPCW", size = "large",plotOutput("timeCourseRowNum"))
-                          ),
-                          tabPanel('Transcript-level analysis', DT::dataTableOutput('PCWTableTr'),
-                                  bsModal("timeCoursePlot_tr", "Expression Trajectory", "PlotPCWTr", size = "large",plotOutput("timeCourseRowNum_tr"))
-                          )
-                        )
-                      )
-                    )
-           )           
+            )
+          
 )
