@@ -18,30 +18,6 @@ library(DT)
 # setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Shiny/GENEX-FB1")
 
 ################################## Define functions ##################################
-PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
-  fit_params <- fittedPCW[row_num,]
-  geneID <- fit_params$Id
-  data <- counts %>% filter(Id == geneID) %>%  
-    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
-    gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
-    left_join(target)
-  mean_age<-mean(target$PCW)
-  fit <- data.frame(PCW=seq(12,19)) %>% mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
-  title<-paste0(geneID, ' (', fit_params$SYMBOL, ')')#: log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
-  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
-    geom_jitter(height = 0, width=.1, alpha=.75) + 
-    geom_line(aes(y=fit), colour='black', data=fit) +
-    scale_x_continuous(breaks=seq(12, 20)) +
-    ylab("normalised counts") +
-    xlab('post-conception weeks') +
-    main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) +
-    ggtitle(title) 
-  plot
-}
-#PlotExpressionRowNum(9337, counts, fittedPCW, target) + scale_y_continuous(limits=c(0,10))
 
 PlotTimepointRowNum<-function(row_num, counts, fitted, target) {
   selection <- fitted[row_num,]
