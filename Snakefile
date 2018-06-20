@@ -105,7 +105,7 @@ rule format_cov:
         cov['V1'] = 'sex' + cov['V1'].astype(str) # change sex to string (categorical)
         cov['V4'] = 'batch' + cov['V4'].astype(str) # change batch to string (categorical)
         cov.columns = ['Sample', 'Sex', 'PCW', 'RIN', 'ReadLength', 'PC1', 'PC2', 'PC3'] + ['PEER' + str(i) for i in range(1, 11)]
-        cov.to_csv(output[0], sep='\t', header=True)
+        cov.to_csv(output[0], sep='\t', header=True, index=False)
 
 rule gene_level:
     input:
