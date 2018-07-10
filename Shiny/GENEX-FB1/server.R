@@ -23,10 +23,9 @@ PlotTimepointRowNum<-function(row_num, counts, fitted, target) {
   selection <- fitted[row_num,]
   geneID <- selection$Id
   data <- counts %>% filter(Id == geneID) %>%  
-    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
+    dplyr::select(-Id) %>%
     gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
+    dplyr::select(Sample=key, value) %>%
     left_join(target)
   mean <- selection %>% dplyr::select(Male, Female) %>%
     gather('Sex', 'mean')
@@ -51,11 +50,8 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
     gather('Sex', 'mean', -Id, -qval) %>%
     mutate(facet=paste0(Id, '\nFDR=', signif(qval, digits = 3)), Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
 
-  data <- filter(counts, GeneId == geneID) %>% 
-      dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
-      gather(key, value, -Id) %>%
-      separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-      dplyr::select(Sample, value, Id) %>%
+  data <- filter(counts, Id %in% mean$Id) %>% 
+      gather(Sample, value, -Id) %>%
       left_join(target) %>%
       mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
       left_join(dplyr::select(mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
@@ -107,21 +103,13 @@ add_links_tr <-function(fitted) {
 ################################## Load Data ##################################
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
-counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(-gene_type)
+counts <-  read_delim("./Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
-  dplyr::select(-gene_type, -maxCooks) %>%
-  arrange(padj)
+fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
 
-counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(-gene_type)
+counts_tr <-  read_delim("./Data/counts_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
   
-  
-fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  dplyr::select(-gene_type, -maxCooks)
+fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
   
 ################################## Run server ##################################
 shinyServer(function(session, input, output) {
