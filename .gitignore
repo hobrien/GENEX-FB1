@@ -9,6 +9,7 @@
 # RStudio files
 .Rproj.user/
 *.Rproj
+R/*_cache/*
 
 # produced vignettes
 vignettes/*.html
@@ -44,13 +45,20 @@ FastQC/*
 Counts/*
 Mappings/*
 Results/*
+Replication/*
 Kallisto/*
 Figures/*
 Tables/*
 Documents/*
 Paper/*
+Peer/*
 Shiny/GENEX-FB1/Data
 TempFiles/*
+
+# Shinyapp.io info
+Shiny/GENEX-FB1/rsconnect
+Shiny/Old_files/*
+Shiny/GENEX-FB1/README.md
 
 # SARTools fork
 R/SARTools
@@ -58,16 +66,11 @@ R/SARTools
 # Log files
 Logs/*
 
-# Shinyapp.io info
-Shiny/GENEX-FB1/rsconnect
-
-# info on setting up shiny app on server
-Shiny/GENEX-FB1/README.md
 
 # Snakemake DAG output
 DAG.svg
 
-# SRA submission files
 Data/BioSampleObjects.txt
 Data/sra_metadata.txt
 
+Data/genes_old.txt

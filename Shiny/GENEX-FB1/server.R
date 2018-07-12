@@ -18,39 +18,14 @@ library(DT)
 # setwd("~/BTSync/FetalRNAseq/Github/GENEX-FB1/Shiny/GENEX-FB1")
 
 ################################## Define functions ##################################
-PlotExpressionRowNum<-function(row_num, counts, fittedPCW, target) {
-  fit_params <- fittedPCW[row_num,]
-  geneID <- fit_params$Id
-  data <- counts %>% filter(Id == geneID) %>%  
-    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
-    gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
-    left_join(target)
-  mean_age<-mean(target$PCW)
-  fit <- data.frame(PCW=seq(12,19)) %>% mutate(fit=fit_params$baseMean*2^(fit_params$log2FoldDiff*(PCW-mean_age)))
-  title<-paste0(geneID, ' (', fit_params$SYMBOL, ')')#: log2 change/week = ', fit_params$log2FoldDiff, ', p=', fit_params$pvalue, ', q=', fit_params$padj)
-  plot<-  ggplot(data, aes(x=PCW, y=value, colour=Sex)) + 
-    geom_jitter(height = 0, width=.1, alpha=.75) + 
-    geom_line(aes(y=fit), colour='black', data=fit) +
-    scale_x_continuous(breaks=seq(12, 20)) +
-    ylab("normalised counts") +
-    xlab('post-conception weeks') +
-    main_theme() +
-    scale_colour_brewer(type = "qual", palette = 6) +
-    ggtitle(title) 
-  plot
-}
-#PlotExpressionRowNum(9337, counts, fittedPCW, target) + scale_y_continuous(limits=c(0,10))
 
 PlotTimepointRowNum<-function(row_num, counts, fitted, target) {
   selection <- fitted[row_num,]
   geneID <- selection$Id
   data <- counts %>% filter(Id == geneID) %>%  
-    dplyr::select(-one_of('SYMBOL', 'Id', 'Chr', 'ChrType', 'GeneId')) %>%
+    dplyr::select(-Id) %>%
     gather() %>%
-    separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-    dplyr::select(Sample, value) %>%
+    dplyr::select(Sample=key, value) %>%
     left_join(target)
   mean <- selection %>% dplyr::select(Male, Female) %>%
     gather('Sex', 'mean')
@@ -75,11 +50,8 @@ PlotTranscriptsRowNum <- function(counts, selection, fitted, target) {
     gather('Sex', 'mean', -Id, -qval) %>%
     mutate(facet=paste0(Id, '\nFDR=', signif(qval, digits = 3)), Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA)))
 
-  data <- filter(counts, GeneId == geneID) %>% 
-      dplyr::select(-SYMBOL, -GeneId, -Chr, -ChrType) %>%
-      gather(key, value, -Id) %>%
-      separate(key, into=c('norm', 'Sample'), sep='[.]') %>%
-      dplyr::select(Sample, value, Id) %>%
+  data <- filter(counts, Id %in% mean$Id) %>% 
+      gather(Sample, value, -Id) %>%
       left_join(target) %>%
       mutate(Sex=ifelse(Sex=='Male', 'M', ifelse(Sex=='Female', 'F', NA))) %>%
       left_join(dplyr::select(mean, Id, qval) %>% group_by(Id) %>% dplyr::slice(1)) %>%
@@ -131,37 +103,18 @@ add_links_tr <-function(fitted) {
 ################################## Load Data ##################################
 target <- read_tsv("./Data/SampleInfo.txt", trim_ws = TRUE, col_names=TRUE, cols(Sample='c')) 
 
-counts <-  read_delim("./Data/counts12_20.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(-gene_type)
+counts <-  read_delim("./Data/counts.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
-  dplyr::select(-gene_type, -maxCooks) %>%
-  arrange(padj)
+fitted <- read_delim("./Data/fitted.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
 
-fittedPCW <- read_delim("./Data/dropPCW.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>% 
-  dplyr::select(-gene_type, -maxCooks) %>%
-  arrange(padj)
-
-counts_tr <-  read_delim("./Data/counts12_20_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::select(-gene_type)
+counts_tr <-  read_delim("./Data/counts_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
   
+fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) 
   
-fitted_tr <- read_delim("./Data/fitted_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  dplyr::select(-gene_type, -maxCooks)
-  
-fittedPCW_tr <- read_delim("./Data/dropPCW_tr.txt", "\t", escape_double = FALSE, trim_ws = TRUE) %>%
-  dplyr::rename(log2FoldDiff = log2FoldChange) %>%
-  dplyr::select(-gene_type, -maxCooks)
-  
-
 ################################## Run server ##################################
 shinyServer(function(session, input, output) {
   observe({
     updateSliderInput(session, "pvalue", value = input$typedPval)
-    updateSliderInput(session, "pvaluePCW", value = input$typedPvalPCW)
   })
 
   ################################## Render plots ################################## 
@@ -183,25 +136,6 @@ shinyServer(function(session, input, output) {
     )
     PlotTranscriptsRowNum(counts_tr, filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)[input$SexDiffTrTable_rows_selected,], fitted_tr, target)
   })
-  output$distPlot <- renderPlot({
-    req(input$geneID)
-    PlotTimepoint(toupper(input$geneID), counts, fitted, target, input$ages)
-  })
-  output$timeCourseRowNum <- renderPlot({
-    validate(
-      need(input$PCWTable_rows_selected != "", "Please select a row from the table")
-    )
-    PlotExpressionRowNum(input$PCWTable_rows_selected, counts, filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
-  })
-  output$timeCourseRowNum_tr <- renderPlot({
-    validate(
-      need(input$PCWTableTr_rows_selected != "", "Please select a row from the table")
-    )
-    PlotExpressionRowNum(input$PCWTableTr_rows_selected, counts_tr, filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW), target)
-  })
-  output$sampleSizeHist <- renderPlot({
-    PlotSampleSize(target, input$ages)
-  })
 
   ################################## Render tables ################################## 
   output$SexDiffTable <- DT::renderDataTable({
@@ -210,13 +144,7 @@ shinyServer(function(session, input, output) {
   output$SexDiffTrTable <- DT::renderDataTable({
     DT::datatable(add_links_tr(filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue)), escape = FALSE, selection="single", caption = 'Genes exhibiting sex differences in fetal brain expression')
   })
-  output$PCWTable <- DT::renderDataTable({
-    DT::datatable(filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
-  })
-  output$PCWTableTr <- DT::renderDataTable({
-    DT::datatable(filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>% add_links_tr(), escape = FALSE, selection="single", caption = 'Genes exhibiting differences in fetal brain expression over development')
-  })
-  
+
   ################################## Download tables ################################## 
   output$downloadSEX <- downloadHandler(
     filename = function() { 'SEXdiffs.txt' },
@@ -231,19 +159,5 @@ shinyServer(function(session, input, output) {
       filter_table(fitted_tr, input$ChrType, input$Bias, input$p_type, input$pvalue) %>%
         write_tsv(file)
     }  
-  )
-  output$downloadPCW <- downloadHandler(
-    filename = function() { 'PCWdiffs.txt' },
-    content = function(file) {
-      filter_table(fittedPCW, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>%
-        write_tsv(file)
-    }
-  )
-  output$downloadPCW_tr <- downloadHandler(
-    filename = function() { 'PCWdiffs_tr.txt' },
-    content = function(file) {
-      filter_table(fittedPCW_tr, input$ChrTypePCW, input$Direction, input$p_typePCW, input$pvaluePCW) %>%
-        write_tsv(file)
-    }
   )
 })

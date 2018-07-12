@@ -305,9 +305,9 @@
 150609_D00200_0263_BC7187ANXX_5_IL-TP-016_1.sanfastq.gz_val_1.fq.gz	15768	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/15768	/c8000xd3/rnaseq-heath/Trimmed
 150609_D00200_0263_BC7187ANXX_5_IL-TP-016_2.sanfastq.gz_val_2.fq.gz	15768	Edinburgh	/neurocluster/databank/foetal-rna/Edinburgh_2nd_batch_sequencing/15768	/c8000xd3/rnaseq-heath/Trimmed
 16024_CTTGTA_L002_R1_001_val_1.fq.gz	16024	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16024_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
-16024_CTTGTA_L002_R2_001_val_2.fq.gz	16024	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16024_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
+16024_CTTGTA_L002_R1_001_val_1.fq	16024	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16024_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
 16115_AGTCAA_L003_R1_001_val_1.fq.gz	16115	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16115_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
-16115_AGTCAA_L003_R2_001_val_2.fq.gz	16115	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16115_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
+16115_AGTCAA_L003_R1_001_val_1.fq	16115	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16115_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
 16117_S56_L007_R1_001.fastq.gz	16117-1	Cardiff	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX
 16117_S56_L007_R2_001.fastq.gz	16117-1	Cardiff	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX
 16117_S56_L008_R1_001.fastq.gz	16117-2	Cardiff	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX	/neurocluster/sequencers/foetalRNAseq/160817_K00267_0020_AHCWLGBBXX
@@ -315,7 +315,7 @@
 150505_D00261_0240_AC6T4NANXX_3_IL-TP-002_1.sanfastq.gz_val_1.fq.gz	16286	Edinburgh	/neurocluster/databank/foetal-rna/1st_batch_Edinburgh_Sequencing/16286	/c8000xd3/rnaseq-heath/Trimmed
 150505_D00261_0240_AC6T4NANXX_3_IL-TP-002_2.sanfastq.gz_val_2.fq.gz	16286	Edinburgh	/neurocluster/databank/foetal-rna/1st_batch_Edinburgh_Sequencing/16286	/c8000xd3/rnaseq-heath/Trimmed
 16385_TGACCA_L004_R1_001_val_1.fq.gz	16385	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16385_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
-16385_TGACCA_L004_R2_001_val_2.fq.gz	16385	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16385_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
+16385_TGACCA_L004_R1_001_val_1.fq	16385	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16385_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
 16428_GTCCGC_L005_R1_001_val_1.fq	16428	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16428_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
 16428_GTCCGC_L005_R2_001_val_2.fq	16428	Exeter	/neurocluster/databank/foetal-rna/Exeter_sequencing/16428_Dec_2014	/c8000xd3/rnaseq-heath/Trimmed
 16483_2_S23_L007_R1_001.fastq.gz	16483-1	Cardiff	/neurocluster/sequencers/foetalRNAseq/160824_K00267_0021_AHCYY3BBXX/Nick_Bray	/neurocluster/sequencers/foetalRNAseq/160824_K00267_0021_AHCYY3BBXX/Nick_Bray
