@@ -60,6 +60,7 @@ TempFiles/*
 
 # Shinyapp.io info
 Shiny/GENEX-FB1/rsconnect
+Shiny/Old_files/*
 
 # SARTools fork
 R/SARTools
