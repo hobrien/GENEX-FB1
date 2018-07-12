@@ -1,53 +1,19 @@
-BASH and R scripts used for all steps of analyses, along with Shiny web app to view results.
+# Workflow for Sex Differences Analyses in the Developing Human Brain
 
-To run mapping on all samples:
-```
-mkdir Mappings
-mkdir FastQC
-for sample in `cut -f2 Data/sequences.txt | sort | uniq`
-do
-    bash Bash/MappingPipeline.sh $sample
-done
-``` 
+- This workflow consists of a [Snakemake](https://snakemake.readthedocs.io/en/stable) workflow
+that can be executed using the supplied bash scripts:
 
-To analyse QC:
-```
-mkdir Tables
-Rscript R/SummariseBamQC.R
-```
+    ```bash snakemake.sh```
 
-To Run Differential Expression analysis:
-```
-mkdir Results
-bash Bash/RunDEanalysis.sh
-```
+- Software used:
+    - [bedtools](http://bedtools.readthedocs.io/en/latest) v2.26.0
+    - [DESeq2](https://bioconductor.org/packages/release/bioc/html/DESeq2.html) v1.20.0
+    - [kallisto](https://pachterlab.github.io/kallisto/) v0.43.0
+    - [pandas](https://pandas.pydata.org) v0.21.0
+    - [PEER](https://github.com/PMBio/peer/wiki) v1.3
+    - [SARTools](https://github.com/PF2-pasteur-fr/SARTools) v1.3.2
+    - [tidyverse](https://www.tidyverse.org) v1.1.1
 
-To run Kallisto on all samples (combine all reads from each sample):
-
-```
-mkdir Kallisto
-cut -f 1 Data/SampleInfo.txt | tail -n +2 | xargs -n 1 qsub Bash/Kallisto.sh 
-``` 
-
-To get transcript to gene mapping:
-```
-echo -e "transcript_id\tgene_id" > Data/tx2gene.txt 
-cat /c8000xd3/rnaseq-heath/Ref/Homo_sapiens/GRCh38/NCBI/GRCh38Decoy/Annotation/Genes.gencode/genes.gtf | grep transcript_id | perl -pe 's/.*(ENSGR?\d+).*(ENSTR?\d+).*/$2\t$1/' >> Data/tx2gene.txt 
-```
-
-To run Differential Expression:
-```
-Bash Bash/RunDEanalyses.sh
-```
-
-To rerun Differential Expression analyses with outliers removed:
-```
-Rscript R/FindOutliers.R
-source activate py35
-snakemake --cluster "qsub -l h_vmem={params.maxvmem}" -j 50
-```
-
-To prepare data files for Shiny web app:
-```
-Rsciprt R/PrepareData.R
-```
+- Genome References:
+    - genome sequence ([GRCh38.p4](https://www.ncbi.nlm.nih.gov/assembly/GCF_000001405.30) with [Decoy sequences](https://www.ncbi.nlm.nih.gov/assembly/GCA_000786075.2))
+    - annotation (derived from [Gencode version 23 (GRCh38.p3)](https://www.gencodegenes.org/releases/23.html))
