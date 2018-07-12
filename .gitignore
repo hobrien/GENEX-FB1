@@ -72,3 +72,5 @@ DAG.svg
 
 Data/BioSampleObjects.txt
 Data/sra_metadata.txt
+
+Data/genes_old.txt
