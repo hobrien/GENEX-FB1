@@ -20,12 +20,14 @@ gene_info <- t2g %>%
   ungroup() %>%
   dplyr::rename(Id=GeneId)
 
+
+
 dplyr::rename(gene_info, gene_id=Id, gene_name=SYMBOL, seqid=Chr) %>% write_tsv("Data/genes.txt")
 
 # Results of gene level analyses
 counts <- read_delim("Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_genes_excl_none_kallistoCounts/tables/sex2vssex1.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-fittedBias <- select(gene_info, Id=gene_id, SYMBOL=gene_name, Chr=seqid, gene_type, ChrType) %>% right_join(select(counts, Id, Female=sex1, Male=sex2, log2FoldDiff=log2FoldChange, pvalue, padj, maxCooks)) %>%
+fittedBias <- gene_info %>% right_join(select(counts, Id, Female=sex1, Male=sex2, log2FoldDiff=log2FoldChange, pvalue, padj, maxCooks)) %>%
   filter(!is.na(padj) & !is.na(Chr) & maxCooks < 1) %>%
   dplyr::select(-gene_type, -maxCooks)
 
@@ -38,9 +40,7 @@ write_tsv(fittedBias, "Shiny/GENEX-FB1/Data/fitted.txt")
 # Results of transcript level analyses
 counts_tr <- read_delim("Results/Sex_PCW_PEER_12_20_FDR_0.1_DESeq_transcripts_excl_none_kallistoCounts/tables/sex2vssex1.complete.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 
-fittedBias_tr <- select(gene_info, gene_id, SYMBOL=gene_name, Chr=seqid, gene_type, ChrType) %>%
-  left_join(tx2gene) %>%
-  rename(Id=transcript_id, GeneId=gene_id) %>%
+fittedBias_tr <- t2g %>%
   right_join(select(counts_tr, Id, Female=sex1, Male=sex2, log2FoldDiff=log2FoldChange, pvalue, padj, maxCooks)) %>%
   filter(!is.na(padj) & !is.na(Chr) & maxCooks < 1) %>%
   dplyr::select(-gene_type, -maxCooks)
@@ -112,8 +112,8 @@ SRA <- data.frame(bioproject_accession=rep('PRJNA417945', NumSamples),
                   platform=rep('ILLUMINA', NumSamples),
                   filetype=rep('fastq', NumSamples)
 )
-SRA <- dplyr::select(SampleInfo, library_ID=Sample, instrument_model=Sequencer) %>%
-  mutate(instrument_model=ifelse(str_detect(instrument_model, '2500'), "Illumina HiSeq 2500", "Illumina HiSeq 4000")) %>%
+SRA <- SampleInfo %>% mutate(instrument_model=ifelse(str_detect(ReadLength, '2x76bp'), "Illumina HiSeq 4000", "Illumina HiSeq 2500")) %>%
+  dplyr::select(library_ID=Sample, instrument_model) %>%
   full_join(SRA)
 
 SRA <- dplyr::select(BioSampleObjects, library_ID=`Sample Name`, biosample_accession=Accession) %>%
