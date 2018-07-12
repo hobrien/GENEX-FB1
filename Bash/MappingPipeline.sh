@@ -8,7 +8,7 @@
 
 # see http://www.tldp.org/LDP/LG/issue18/bash.html for bash Parameter Substitution
 
-BASEDIR=/c8000xd3/rnaseq-heath/GENEX-FB1
+BASEDIR=GENEX-FB1
 SampleID=$1 
 
 

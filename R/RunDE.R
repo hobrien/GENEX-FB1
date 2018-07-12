@@ -45,7 +45,7 @@ option_list <- list (
   make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
               help="Use counts derived from Kallisto"),
   make_option(c("-o", "--out"), type="character", default=NA, 
-              help="project name/directory")
+              help="project name/output folder name")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -86,6 +86,7 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  ),
                  PCW_cutoff[1]
 )
+
 interact <- strsplit(opt$options$interact, ',')[[1]]
 
 exclude <- strsplit(opt$options$exclude, '_')[[1]]
@@ -409,5 +410,3 @@ writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summar
                    independentFiltering=independentFiltering, alpha=alpha, pAdjustMethod=pAdjustMethod,
                    typeTrans=typeTrans, locfunc=locfunc, colors=colors)
 }
-
-

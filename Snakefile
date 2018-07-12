@@ -28,15 +28,15 @@ rule transcript_seqs:
 
 rule make_index:
     input:
-        rules.transcript_seqs.output
+        sample_info="Data/SampleInfo.txt"
     output:
         os.path.join(os.path.dirname(rules.transcript_seqs.output[0]), "kallisto.inx")
     log:
-        "Logs/kallisto_index.txt"
+        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_genes_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(kallisto index -i {output} {input}) 2> {log}"
+        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --exclude {params.exclude} --out {params.out_name}) 2> {log}"
         
-rule run_kalliso:
+rule transcript_level:
     input:
         index = rules.make_index.output,
         reads = lambda wildcards: files[wildcards.sample]
@@ -47,9 +47,9 @@ rule run_kalliso:
     params:
         prefix = "Kallisto/{sample}"
     log:
-        "Logs/kallisto_quant_{sample}.txt"
+        "Logs/Sex_PCW_12_20_FDR_0.1_DESeq_transcripts_excl_{excluded}_kallistoCounts.txt"
     shell:
-        "(kallisto quant -i {input.index} -o {params.prefix} --bias -b 100 --rf-stranded {input.reads}) 2> {log}"
+        "(Rscript R/RunDE.R --min 12 --max 20 --cofactor PCW --tool DESeq --kallisto --feature transcripts --exclude {params.exclude} --out {params.out_name}) 2> {log}"
 
 rule estimate_counts:
     input:

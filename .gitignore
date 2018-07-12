@@ -40,9 +40,6 @@ Python/.ipynb_checkpoints/*
 #Stupid Mac files
 *.DS_Store
 
-#Input data
-Data/*
-
 # Output files from scripts
 FastQC/*
 Counts/*
@@ -61,6 +58,7 @@ TempFiles/*
 # Shinyapp.io info
 Shiny/GENEX-FB1/rsconnect
 Shiny/Old_files/*
+Shiny/GENEX-FB1/README.md
 
 # SARTools fork
 R/SARTools
@@ -68,12 +66,9 @@ R/SARTools
 # Log files
 Logs/*
 
-# info on setting up shiny app on server
-Shiny/GENEX-FB1/README.md
 
 # Snakemake DAG output
 DAG.svg
 
-
-# External datasets
-Data/Brainspan/*
+Data/BioSampleObjects.txt
+Data/sra_metadata.txt

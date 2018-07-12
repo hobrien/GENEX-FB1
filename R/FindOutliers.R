@@ -60,6 +60,6 @@ for (duplicated in all_duplicated$excluded) {
 #x <- mutate(x, excluded=paste0("'", excluded, "'"))
 transcriptsList <- as.list(transcripts$Id)
 names(transcriptsList) <- as.character(transcripts$excluded)
-as.yaml(list(gene_level=myList, transcript_level=transcriptsList), indent=4) %>% write_file("~/Desktop/test.yaml")
+as.yaml(list(gene_level=myList, transcript_level=transcriptsList), indent=4) %>% write_file("config.yaml")
 
 
