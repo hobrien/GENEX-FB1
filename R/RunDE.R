@@ -45,7 +45,7 @@ option_list <- list (
   make_option(c("-k", "--kallisto"), action='store_true', type="logical", default=FALSE, 
               help="Use counts derived from Kallisto"),
   make_option(c("-o", "--out"), type="character", default=NA, 
-              help="project name/output folder name")
+              help="project name/directory")
 )
 
 opt_parser <- OptionParser(option_list=option_list)
@@ -86,7 +86,6 @@ ageBin <- ifelse(PCW_cutoff[2]-PCW_cutoff[1] > 1,
                  ),
                  PCW_cutoff[1]
 )
-
 interact <- strsplit(opt$options$interact, ',')[[1]]
 
 exclude <- strsplit(opt$options$exclude, '_')[[1]]
@@ -215,8 +214,10 @@ LibraryInfo <- LibraryInfo[match(map_chr(opt$args, ~ str_split(., '/')[[1]][2]),
 if (opt$options$kallisto) {
     library(tximport)
     tx2gene <- read_tsv("Data/tx2gene.txt")
-    files <- opt$args
+    files <- opt$args[!is.na(LibraryInfo$Sample)]
+    LibraryInfo <- LibraryInfo[!is.na(LibraryInfo$Sample),]
     names(files) <- LibraryInfo$Sample
+    rownames(LibraryInfo) <- LibraryInfo$Sample
     if ( opt$options$feature == 'genes' ) {
       counts <- tximport(files, type = "kallisto", tx2gene = tx2gene, reader=read_tsv, ignoreTxVersion = TRUE)
     } else if ( opt$options$feature == 'transcripts' ) {
@@ -410,3 +411,5 @@ writeReport.edgeR(target=LibraryInfo, counts=counts, out.edgeR=out.edgeR, summar
                    independentFiltering=independentFiltering, alpha=alpha, pAdjustMethod=pAdjustMethod,
                    typeTrans=typeTrans, locfunc=locfunc, colors=colors)
 }
+
+
