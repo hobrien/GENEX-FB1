@@ -1,13 +1,7 @@
 __default__:
     num_cores: 1
     maxvmem: 4G
-gene_level_peer:
-    num_cores: 1
-    maxvmem: 20G
 gene_level:
-    num_cores: 1
-    maxvmem: 20G
-gene_level_rep:
     num_cores: 1
     maxvmem: 20G
 estimate_counts:
@@ -20,8 +14,5 @@ transcript_level:
     num_cores: 1
     maxvmem: 20G
 run_kalliso:
-    num_cores: 1
-    maxvmem: 6G
-run_kalliso_rep:
     num_cores: 1
     maxvmem: 6G
